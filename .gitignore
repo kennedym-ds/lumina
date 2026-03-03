@@ -1,0 +1,36 @@
+# Node
+node_modules/
+dist/
+.vite/
+
+# Rust  
+target/
+*.pdb
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+backend/dist/
+backend/build/
+
+# PyInstaller
+*.spec.bak
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Environment
+.env
+.env.local
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Artifacts (keep structure, ignore sessions)
+artifacts/sessions/
