@@ -9,13 +9,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.middleware.auth import BearerTokenMiddleware
+from app.routers.data import router as data_router
+from app.routers.eda import router as eda_router
+from app.routers.model import router as model_router
+from app.routers.project import router as project_router
+from app.routers.views import router as views_router
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Lumina Backend",
-        version="0.0.0",
+        version="1.0.0",
         docs_url="/api/docs" if settings.debug else None,
         redoc_url=None,
     )
@@ -35,7 +40,13 @@ def create_app() -> FastAPI:
     # Health endpoint (no auth required — handled before middleware)
     @app.get("/api/health")
     async def health():
-        return {"status": "ok", "version": "0.0.0"}
+        return {"status": "ok", "version": "1.0.0"}
+
+    app.include_router(data_router)
+    app.include_router(eda_router)
+    app.include_router(model_router)
+    app.include_router(project_router)
+    app.include_router(views_router)
 
     return app
 

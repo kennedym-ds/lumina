@@ -1,0 +1,89 @@
+"""Pydantic models for project persistence and chart export."""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class ChartState(BaseModel):
+    """Serialized state of a single chart."""
+
+    chart_id: str
+    chart_type: str
+    x: str | None = None
+    y: str | None = None
+    color: str | None = None
+    facet: str | None = None
+    nbins: int | None = None
+
+
+class RegressionState(BaseModel):
+    """Serialized regression configuration (not fitted model artifacts)."""
+
+    model_type: str  # "ols" | "logistic"
+    dependent: str | None = None
+    independents: list[str] = Field(default_factory=list)
+    train_test_split: float = 1.0
+    missing_strategy: str = "listwise"
+
+
+class CrossFilterState(BaseModel):
+    """Serialized cross-filter selection state."""
+
+    selected_indices: list[int] = Field(default_factory=list)
+    selection_source: str | None = None
+
+
+class ProjectSchema(BaseModel):
+    """The .lumina project file schema."""
+
+    version: str = "1.0"
+
+    file_path: str
+    file_name: str
+    file_format: str
+    sheet_name: str | None = None
+
+    column_config: list[dict] = Field(default_factory=list)
+
+    charts: list[ChartState] = Field(default_factory=list)
+    active_chart_id: str | None = None
+
+    regression: RegressionState | None = None
+
+    cross_filter: CrossFilterState | None = None
+
+
+class SaveRequest(BaseModel):
+    """Request body for project save."""
+
+    file_path: str
+    project: ProjectSchema
+
+
+class LoadRequest(BaseModel):
+    """Request body for project load."""
+
+    file_path: str
+
+
+class LoadResponse(BaseModel):
+    """Response payload after loading a project and rebuilding session state."""
+
+    dataset_id: str
+    file_name: str
+    file_format: str
+    row_count: int
+    column_count: int
+    columns: list[dict]
+    project: ProjectSchema
+
+
+class ExportRequest(BaseModel):
+    """Request body for chart export."""
+
+    figure: dict
+    format: str = "png"  # "png" | "svg"
+    width: int = 1200
+    height: int = 800
+    scale: int = 2

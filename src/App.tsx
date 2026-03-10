@@ -1,31 +1,52 @@
-import { useEffect, useState } from "react";
-import { apiClient } from "./api/client";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ApiError } from "@/api/client";
+import { useUploadFile } from "@/api/data";
+import { AppLayout } from "@/components/Layout/AppLayout";
+import { FileDropZone } from "@/components/Import/FileDropZone";
+import { useDatasetStore } from "@/stores/datasetStore";
+import type { UploadResponse } from "@/types/data";
 
-function App() {
-  const [backendStatus, setBackendStatus] = useState<string>("Connecting...");
+function MainRoute() {
+  const uploadMutation = useUploadFile();
+  const setDataset = useDatasetStore((state) => state.setDataset);
+  const setLoading = useDatasetStore((state) => state.setLoading);
+  const setError = useDatasetStore((state) => state.setError);
 
-  useEffect(() => {
-    apiClient
-      .get<{ status: string }>("/api/health")
-      .then((data) => setBackendStatus(data.status === "ok" ? "Backend OK" : "Unexpected response"))
-      .catch(() => setBackendStatus("Backend unavailable"));
-  }, []);
+  const handleUpload = async (file: File, sheet?: string): Promise<UploadResponse> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await uploadMutation.mutateAsync({ file, sheet });
+      setDataset(response);
+      return response;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setError(error.userMessage ?? error.message);
+      } else if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("Upload failed.");
+      }
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold text-lumina-700">Lumina</h1>
-      <p className="mt-2 text-lg text-gray-600">Data Visualization &amp; Modeling Platform</p>
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white px-6 py-3 shadow-sm">
-        <span
-          className={
-            backendStatus === "Backend OK" ? "text-green-600 font-medium" : "text-amber-600"
-          }
-        >
-          {backendStatus}
-        </span>
-      </div>
-    </div>
+    <FileDropZone onUpload={handleUpload}>
+      <AppLayout onUpload={handleUpload} isUploading={uploadMutation.isPending} />
+    </FileDropZone>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainRoute />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
