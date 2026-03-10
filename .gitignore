@@ -33,4 +33,4 @@ Thumbs.db
 .DS_Store
 
 # Artifacts (keep structure, ignore sessions)
-artifacts/sessions/
+artifacts/
