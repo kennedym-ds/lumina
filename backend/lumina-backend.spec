@@ -8,8 +8,8 @@ from pathlib import Path
 from PyInstaller.building.build_main import Analysis, COLLECT, EXE, PYZ
 from PyInstaller.utils.hooks import collect_submodules
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent
+# SPECPATH is injected by PyInstaller — it's the directory containing this spec file.
+PROJECT_ROOT = Path(SPECPATH).resolve()
 APP_ROOT = PROJECT_ROOT / "app"
 ENTRY_SCRIPT = APP_ROOT / "main.py"
 SAMPLES_ROOT = APP_ROOT / "data" / "samples"
