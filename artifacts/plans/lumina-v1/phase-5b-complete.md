@@ -1,47 +1,46 @@
-# Phase 5B Complete: Frontend Persistence & Export UI
+# Phase 5B Complete: Tree-Based Regression Models & Model Comparison
 
-**Completed**: 2026-03-10
-**Implementer**: GitHub Copilot (GPT-5.3-Codex)
+**Completed**: 2026-03-11
+**Implementer**: GitHub Copilot (GPT-5.4)
 
 ## Changes Made
 
 | File | Change Type | Description |
 | ---- | ----------- | ----------- |
-| `src/types/project.ts` | Added | Frontend project persistence/export contracts (`ProjectSchema`, save/load/export payloads). |
-| `src/services/projectSerializer.ts` | Added | Serializes dataset/chart/regression/cross-filter Zustand state into `ProjectSchema`. |
-| `src/api/project.ts` | Added | React Query save/load mutations + binary export helper with authenticated fetch. |
-| `src/components/Toolbar/SaveButton.tsx` | Added | Save flow (serialize → file picker with Tauri fallback → `/api/project/save`). |
-| `src/components/Toolbar/OpenButton.tsx` | Added | Open flow (file picker with fallback → `/api/project/load` → hydrate all stores). |
-| `src/components/Toolbar/ExportChartButton.tsx` | Added | Export dropdown for PNG/SVG using active chart figure and blob download helper. |
-| `src/hooks/useUnsavedChanges.ts` | Added | Dirty-state tracking across stores + browser `beforeunload` and Tauri close-request guard. |
-| `src/stores/datasetStore.ts` | Updated | Added `filePath` field, upload-path capture, and `hydrate()` bulk setter. |
-| `src/stores/chartStore.ts` | Updated | Added `hydrateCharts()` bulk replacement API with active-chart normalization. |
-| `src/stores/regressionStore.ts` | Updated | Added `hydrateRegression()` bulk config hydration/reset API. |
-| `src/types/data.ts` | Updated | Added optional `file_path` on `UploadResponse` for persistence fidelity. |
-| `src/components/Layout/AppLayout.tsx` | Updated | Added Open/Save/Export controls and unsaved-changes indicator in toolbar. |
-| `src/platforms/regression/__tests__/RegressionPlatform.test.tsx` | Updated | Mocked new toolbar/hook dependencies for isolated layout test compatibility. |
-| `src/services/__tests__/projectSerializer.test.ts` | Added | Serializer tests for empty state, full state, and empty cross-filter behavior. |
-| `src/stores/__tests__/chartStore.test.ts` | Added | Chart hydration replacement test (`hydrateCharts`). |
-| `src/hooks/__tests__/useUnsavedChanges.test.ts` | Added | Dirty-state hook tests (`starts false`, `becomes true on store mutation`). |
-| `src/stores/__tests__/datasetStore.test.ts` | Updated | Added assertions for `filePath` and `hydrate()` behavior. |
-| `src/stores/__tests__/regressionStore.test.ts` | Updated | Added `hydrateRegression()` behavior coverage. |
+| `backend/app/models/regression.py` | Updated | Added tree-model request fields (`max_depth`, `n_estimators`), `feature_importances`, and model-comparison response schemas. |
+| `backend/app/services/regression.py` | Updated | Implemented `DecisionTreeRegressor` and `RandomForestRegressor` fitters, feature-importance serialization, and RMSE/MAE reporting for tree models. |
+| `backend/app/routers/model.py` | Updated | Added `decision_tree`/`random_forest` dispatch, session-local comparison history accumulation, and `GET /api/model/{dataset_id}/comparison`. |
+| `backend/app/session.py` | Updated | Added `model_history` storage so fitted-model summaries can be compared within a dataset session. |
+| `backend/app/models/project.py` | Updated | Extended persisted regression state to carry `max_depth` and `n_estimators`. |
+| `backend/tests/test_model_routes.py` | Updated | Added coverage for tree-model fitting, feature importances, comparison history, parameter plumbing, and RMSE/MAE metrics. |
+| `backend/tests/test_project_routes.py` | Updated | Updated project round-trip expectations for the new persisted regression defaults. |
+| `src/types/regression.ts` | Updated | Added frontend tree-model types, feature-importance shapes, and comparison response contracts. |
+| `src/types/project.ts` | Updated | Extended persisted regression config shape with `max_depth` and `n_estimators`. |
+| `src/stores/regressionStore.ts` | Updated | Added tree hyperparameter state/actions and hydration support for persisted regression settings. |
+| `src/services/projectSerializer.ts` | Updated | Persisted tree-model hyperparameters during project save/export serialization. |
+| `src/components/Toolbar/OpenButton.tsx` | Updated | Hydrated persisted tree-model hyperparameters when loading a saved project. |
+| `src/api/model.ts` | Updated | Added comparison query hook for fetching accumulated fitted-model summaries. |
+| `src/platforms/regression/ModelConfigPanel.tsx` | Updated | Added `Decision Tree` and `Random Forest` selectors plus `Max Depth`/`Number of Trees` controls. |
+| `src/platforms/regression/RegressionPlatform.tsx` | Updated | Sent tree-model parameters in fit requests, refreshed comparison results after fit, and rendered a model-comparison table. |
+| `src/platforms/regression/ResultsSummary.tsx` | Updated | Rendered tree-model feature importances as a bar-style summary and expanded metric cards with RMSE/MAE. |
+| `src/stores/__tests__/regressionStore.test.ts` | Updated | Added assertions for new regression defaults, hydration, and response shape extensions. |
+| `src/services/__tests__/projectSerializer.test.ts` | Updated | Added serialization expectations for tree-model persistence fields. |
+| `src/platforms/regression/__tests__/RegressionPlatform.test.tsx` | Updated | Added coverage for the seven-model selector, tree controls, feature-importance rendering, comparison UI, and random-forest request payloads. |
 
 ## Test Results
 
 | Command | Result | Notes |
 | ------- | ------ | ----- |
-| `npx vitest run src/services/__tests__/projectSerializer.test.ts src/stores/__tests__/chartStore.test.ts src/hooks/__tests__/useUnsavedChanges.test.ts` (pre-impl) | ❌ Fail | Expected RED: missing `projectSerializer`, missing `useUnsavedChanges`, missing `hydrateCharts`. |
-| `npx vitest run src/services/__tests__/projectSerializer.test.ts src/stores/__tests__/chartStore.test.ts src/hooks/__tests__/useUnsavedChanges.test.ts src/stores/__tests__/datasetStore.test.ts src/stores/__tests__/regressionStore.test.ts` | ✅ Pass | 5 files, 16 tests passed. |
-| `npx tsc --noEmit` (first post-impl run) | ❌ Fail | Strict cast error in `OpenButton` for loaded columns payload. |
-| `npx tsc --noEmit` (post-fix) | ✅ Pass | Explicit `TSC_OK` marker confirmed zero type errors. |
-| `npx vitest run` | ✅ Pass | 10 files, 37 tests passed (existing + new). |
+| `.\.venv\Scripts\python.exe -m pytest tests -v` | ✅ Pass | 176 backend tests passed in 9.49s. |
+| `& "C:\Program Files\nodejs\node.exe" .\node_modules\typescript\bin\tsc --noEmit` | ✅ Pass | Type-check completed with zero TypeScript errors. |
+| `& "C:\Program Files\nodejs\node.exe" .\node_modules\vitest\vitest.mjs run` | ✅ Pass | 25 frontend test files passed; 98 tests passed in 3.64s. |
 
 ## Residual Risks
 
-- Save/Open currently use browser `window.alert`/`prompt` for dev fallback UX; this is functional but not polished.
-- `ExportChartButton` exports the currently active chart configuration; if chart query data is not yet materialized, users must render/select a valid chart first.
-- Loaded project columns are cast from generic backend payload (`Record<string, unknown>[]`) to `ColumnInfo[]`; backend/frontend schema drift could surface at runtime if contracts diverge.
+- Model comparison history is session-local; it resets when a dataset session is recreated unless future work persists comparison snapshots explicitly.
+- Tree-model responses expose feature importance rather than inferential statistics; fields like AIC/BIC/adjusted $R^2$ remain intentionally unavailable for those estimators.
+- The comparison table currently accumulates fitted models for the active session without a clear/reset UX, so long exploratory sessions may produce a noisy side-by-side list.
 
 ## Next Phase
 
-Phase 6 can build on this foundation for onboarding UX improvements (e.g., toast system, recent projects, richer close-flow prompts, and view persistence extensions).
+The next iteration can build richer model-evaluation workflows on top of this foundation, such as comparison filtering/reset controls, persisted model histories, and classification-oriented tree variants if the roadmap still calls for them.

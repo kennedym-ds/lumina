@@ -1,7 +1,7 @@
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
 
 export function ResetSelectionButton() {
-  const count = useCrossFilterStore((state) => state.selectedIndices.length);
+  const count = useCrossFilterStore((state) => state.selectedRowIds.size);
   const clearSelection = useCrossFilterStore((state) => state.clearSelection);
 
   if (count === 0) {

@@ -5,9 +5,19 @@ import uuid
 from fastapi import APIRouter, HTTPException
 import pandas as pd
 
-from app.models.eda import ChartRequest, ChartResponse, DownsampleRequest, DownsampleResponse
+from app.models.eda import (
+    ChartRequest,
+    ChartResponse,
+    DistributionRequest,
+    DistributionResponse,
+    DownsampleRequest,
+    DownsampleResponse,
+)
+from app.models.profiling import CorrelationRequest, CorrelationResponse, DatasetProfile
 from app.services.chart_builder import build_chart_figure
+from app.services.distribution import compute_kde
 from app.services.downsampling import lttb_downsample
+from app.services.profiling import compute_correlation, profile_dataset
 from app.session import store
 
 router = APIRouter(prefix="/api/eda", tags=["eda"])
@@ -22,6 +32,14 @@ def _get_session(dataset_id: str):
     return session
 
 
+def _remember_chart_config(session, request: ChartRequest) -> None:
+    chart_config = request.model_dump(exclude_none=True)
+    if chart_config in session.chart_configs:
+        session.chart_configs = [item for item in session.chart_configs if item != chart_config]
+    session.chart_configs.append(chart_config)
+    session.chart_configs = session.chart_configs[-10:]
+
+
 @router.post("/{dataset_id}/chart", response_model=ChartResponse)
 async def create_chart(dataset_id: str, request: ChartRequest):
     """Create a Plotly JSON figure for a dataset based on chart configuration."""
@@ -29,9 +47,13 @@ async def create_chart(dataset_id: str, request: ChartRequest):
     session = _get_session(dataset_id)
 
     try:
-        figure, row_count, webgl = build_chart_figure(session.dataframe, request)
+        figure, row_count, webgl, warnings, downsampled, displayed_count = build_chart_figure(
+            session.active_dataframe, request
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    _remember_chart_config(session, request)
 
     return ChartResponse(
         chart_id=str(uuid.uuid4()),
@@ -39,6 +61,9 @@ async def create_chart(dataset_id: str, request: ChartRequest):
         plotly_figure=figure,
         row_count=row_count,
         webgl=webgl,
+        warnings=warnings,
+        downsampled=downsampled,
+        displayed_row_count=displayed_count,
     )
 
 
@@ -47,7 +72,7 @@ async def downsample_chart(dataset_id: str, request: DownsampleRequest):
     """Downsample chart data for large time-series rendering."""
 
     session = _get_session(dataset_id)
-    df = session.dataframe
+    df = session.active_dataframe
 
     if request.x_column not in df.columns:
         raise HTTPException(status_code=400, detail=f"Column '{request.x_column}' not found")
@@ -85,6 +110,25 @@ async def downsample_chart(dataset_id: str, request: DownsampleRequest):
     )
 
 
+@router.post("/{dataset_id}/distribution", response_model=DistributionResponse)
+async def get_distribution(dataset_id: str, request: DistributionRequest):
+    """Compute KDE distribution traces for a numeric column, optionally grouped."""
+
+    session = _get_session(dataset_id)
+
+    try:
+        traces = compute_kde(
+            session.active_dataframe,
+            request.column,
+            request.group_by,
+            request.n_points,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return DistributionResponse(column=request.column, group_by=request.group_by, traces=traces)
+
+
 def _json_safe(value):
     """Convert pandas/numpy scalar values to JSON-safe primitives."""
 
@@ -101,3 +145,27 @@ def _json_safe(value):
             pass
 
     return value
+
+
+@router.get("/{dataset_id}/profile", response_model=DatasetProfile)
+async def get_profile(dataset_id: str):
+    """Generate a comprehensive profiling report for the dataset."""
+
+    session = _get_session(dataset_id)
+    profile = profile_dataset(dataset_id, session.active_dataframe)
+    session.profile_snapshot = profile.model_dump()
+    return profile
+
+
+@router.post("/{dataset_id}/correlation", response_model=CorrelationResponse)
+async def get_correlation(dataset_id: str, request: CorrelationRequest):
+    """Compute a correlation matrix for the dataset's numeric columns."""
+
+    session = _get_session(dataset_id)
+
+    try:
+        columns, matrix = compute_correlation(session.active_dataframe, request.method)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return CorrelationResponse(method=request.method, columns=columns, matrix=matrix)

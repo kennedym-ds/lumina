@@ -1,11 +1,13 @@
 {
   "name": "lumina",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:backend": "pwsh scripts/build-backend.ps1",
+    "build:installer": "pwsh scripts/build-tauri.ps1",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",

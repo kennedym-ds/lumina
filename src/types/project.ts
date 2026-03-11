@@ -1,3 +1,5 @@
+import type { RegressionMissingStrategy, RegressionModelType } from "@/types/regression";
+
 export interface ChartState {
   chart_id: string;
   chart_type: string;
@@ -5,20 +7,36 @@ export interface ChartState {
   y: string | null;
   color: string | null;
   facet: string | null;
+  aggregation?: string | null;
+  values?: string | null;
   nbins?: number | null;
 }
 
 export interface RegressionState {
-  model_type: "ols" | "logistic";
+  model_type: RegressionModelType;
   dependent: string | null;
   independents: string[];
   train_test_split: number;
-  missing_strategy: "listwise" | "mean_imputation";
+  missing_strategy: RegressionMissingStrategy;
+  alpha: number;
+  l1_ratio: number;
+  polynomial_degree: number;
+  max_depth: number | null;
+  n_estimators: number;
 }
 
 export interface CrossFilterState {
   selected_indices: number[];
   selection_source: string | null;
+}
+
+export interface DashboardPanelState {
+  id: string;
+  chart_id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface ProjectSchema {
@@ -28,8 +46,11 @@ export interface ProjectSchema {
   file_format: string;
   sheet_name: string | null;
   column_config: Record<string, unknown>[];
+  saved_views: Record<string, unknown>[];
+  excluded_columns: string[];
   charts: ChartState[];
   active_chart_id: string | null;
+  dashboard_panels: DashboardPanelState[];
   regression: RegressionState | null;
   cross_filter: CrossFilterState | null;
 }

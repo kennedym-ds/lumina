@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
 import type {
+  CastColumnRequest,
   ColumnConfigItem,
   ColumnConfigResponse,
   PreviewResponse,
@@ -83,5 +84,13 @@ export const useUpdateColumnConfig = (
       apiClient.post<ColumnConfigResponse>(`/api/data/${datasetId}/column-config`, {
         columns,
       }),
+  });
+};
+
+export const useCastColumn = (
+  datasetId: string | null,
+): UseMutationResult<ColumnConfigResponse, Error, CastColumnRequest> => {
+  return useMutation({
+    mutationFn: (request) => apiClient.post<ColumnConfigResponse>(`/api/data/${datasetId}/cast-column`, request),
   });
 };

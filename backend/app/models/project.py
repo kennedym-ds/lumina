@@ -20,11 +20,16 @@ class ChartState(BaseModel):
 class RegressionState(BaseModel):
     """Serialized regression configuration (not fitted model artifacts)."""
 
-    model_type: str  # "ols" | "logistic"
+    model_type: str  # "ols" | "logistic" | "ridge" | "lasso" | "elastic_net" | "decision_tree" | "random_forest"
     dependent: str | None = None
     independents: list[str] = Field(default_factory=list)
     train_test_split: float = 1.0
     missing_strategy: str = "listwise"
+    alpha: float = Field(default=1.0, gt=0)
+    l1_ratio: float = Field(default=0.5, ge=0.0, le=1.0)
+    polynomial_degree: int = Field(default=1, ge=1, le=5)
+    max_depth: int | None = Field(default=None, ge=1)
+    n_estimators: int = Field(default=100, ge=1)
 
 
 class CrossFilterState(BaseModel):
@@ -34,10 +39,21 @@ class CrossFilterState(BaseModel):
     selection_source: str | None = None
 
 
+class DashboardPanelState(BaseModel):
+    """Serialized dashboard panel layout metadata."""
+
+    id: str
+    chart_id: str
+    x: int = Field(default=0, ge=0)
+    y: int = Field(default=0, ge=0)
+    w: int = Field(default=3, ge=1, le=6)
+    h: int = Field(default=2, ge=1, le=4)
+
+
 class ProjectSchema(BaseModel):
     """The .lumina project file schema."""
 
-    version: str = "1.0"
+    version: str = "1.1"
 
     file_path: str
     file_name: str
@@ -45,9 +61,12 @@ class ProjectSchema(BaseModel):
     sheet_name: str | None = None
 
     column_config: list[dict] = Field(default_factory=list)
+    saved_views: list[dict] = Field(default_factory=list)
+    excluded_columns: list[str] = Field(default_factory=list)
 
     charts: list[ChartState] = Field(default_factory=list)
     active_chart_id: str | None = None
+    dashboard_panels: list[DashboardPanelState] = Field(default_factory=list)
 
     regression: RegressionState | None = None
 

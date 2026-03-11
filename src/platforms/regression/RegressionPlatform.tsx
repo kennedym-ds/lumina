@@ -5,12 +5,13 @@ import {
   useConfusionMatrix,
   useDiagnostics,
   useFitRegression,
+  useModelComparison,
   useRoc,
 } from "@/api/model";
 import { ErrorToast } from "@/components/Toolbar/ErrorToast";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useRegressionStore } from "@/stores/regressionStore";
-import type { RegressionRequest } from "@/types/regression";
+import type { ModelComparisonEntry, RegressionRequest } from "@/types/regression";
 import { ConfusionMatrix } from "./ConfusionMatrix";
 import { DiagnosticPlots } from "./DiagnosticPlots";
 import { MissingValueDialog } from "./MissingValueDialog";
@@ -34,6 +35,22 @@ function getErrorMessage(error: unknown): string {
   return "Unable to fit model. Please review your settings and try again.";
 }
 
+function formatComparisonMetric(value: number | null | undefined, digits = 3): string {
+  if (value == null || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return Number(value).toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function getComparisonPrimaryMetric(model: ModelComparisonEntry): { label: string; value: number | null } {
+  if (model.accuracy != null) {
+    return { label: "Accuracy", value: model.accuracy };
+  }
+
+  return { label: "R²", value: model.r_squared };
+}
+
 export function RegressionPlatform() {
   const datasetId = useDatasetStore((state) => state.datasetId);
   const columns = useDatasetStore((state) => state.columns);
@@ -43,6 +60,11 @@ export function RegressionPlatform() {
   const independents = useRegressionStore((state) => state.independents);
   const trainTestSplit = useRegressionStore((state) => state.trainTestSplit);
   const missingStrategy = useRegressionStore((state) => state.missingStrategy);
+  const alpha = useRegressionStore((state) => state.alpha);
+  const l1Ratio = useRegressionStore((state) => state.l1Ratio);
+  const polynomialDegree = useRegressionStore((state) => state.polynomialDegree);
+  const maxDepth = useRegressionStore((state) => state.maxDepth);
+  const nEstimators = useRegressionStore((state) => state.nEstimators);
   const lastResult = useRegressionStore((state) => state.lastResult);
   const isModelFitted = useRegressionStore((state) => state.isModelFitted);
 
@@ -52,6 +74,11 @@ export function RegressionPlatform() {
   const removeIndependent = useRegressionStore((state) => state.removeIndependent);
   const setTrainTestSplit = useRegressionStore((state) => state.setTrainTestSplit);
   const setMissingStrategy = useRegressionStore((state) => state.setMissingStrategy);
+  const setAlpha = useRegressionStore((state) => state.setAlpha);
+  const setL1Ratio = useRegressionStore((state) => state.setL1Ratio);
+  const setPolynomialDegree = useRegressionStore((state) => state.setPolynomialDegree);
+  const setMaxDepth = useRegressionStore((state) => state.setMaxDepth);
+  const setNEstimators = useRegressionStore((state) => state.setNEstimators);
   const setResult = useRegressionStore((state) => state.setResult);
 
   const fitMutation = useFitRegression(datasetId);
@@ -63,6 +90,7 @@ export function RegressionPlatform() {
   const diagnosticsQuery = useDiagnostics(datasetId, isOlsModel);
   const confusionQuery = useConfusionMatrix(datasetId, isLogisticModel);
   const rocQuery = useRoc(datasetId, isLogisticModel);
+  const comparisonQuery = useModelComparison(datasetId, Boolean(datasetId));
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [missingReport, setMissingReport] = useState<Awaited<
@@ -77,6 +105,7 @@ export function RegressionPlatform() {
     try {
       const result = await fitMutation.mutateAsync(request);
       setResult(result);
+      void comparisonQuery.refetch();
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -94,6 +123,11 @@ export function RegressionPlatform() {
       independents,
       train_test_split: trainTestSplit,
       missing_strategy: missingStrategy,
+      alpha,
+      l1_ratio: l1Ratio,
+      polynomial_degree: polynomialDegree,
+      max_depth: maxDepth,
+      n_estimators: nEstimators,
     };
 
     try {
@@ -149,6 +183,11 @@ export function RegressionPlatform() {
             independents={independents}
             trainTestSplit={trainTestSplit}
             missingStrategy={missingStrategy}
+            alpha={alpha}
+            l1Ratio={l1Ratio}
+            polynomialDegree={polynomialDegree}
+            maxDepth={maxDepth}
+            nEstimators={nEstimators}
             isBusy={isBusy}
             onModelTypeChange={setModelType}
             onDependentChange={setDependent}
@@ -162,6 +201,11 @@ export function RegressionPlatform() {
             }}
             onTrainTestSplitChange={setTrainTestSplit}
             onMissingStrategyChange={setMissingStrategy}
+            onAlphaChange={setAlpha}
+            onL1RatioChange={setL1Ratio}
+            onPolynomialDegreeChange={setPolynomialDegree}
+            onMaxDepthChange={setMaxDepth}
+            onNEstimatorsChange={setNEstimators}
             onFit={handleFitModel}
           />
         </aside>
@@ -183,6 +227,48 @@ export function RegressionPlatform() {
                     ))}
                   </ul>
                 </div>
+              ) : null}
+
+              {comparisonQuery.data?.models.length ? (
+                <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <h2 className="mb-3 text-sm font-semibold text-slate-800">Model Comparison</h2>
+                  <div className="overflow-auto rounded border border-slate-200">
+                    <table className="min-w-full divide-y divide-slate-200 text-xs">
+                      <thead className="bg-slate-50 text-left text-slate-700">
+                        <tr>
+                          <th className="px-2 py-2 font-semibold">Model</th>
+                          <th className="px-2 py-2 font-semibold">Primary Metric</th>
+                          <th className="px-2 py-2 font-semibold">RMSE</th>
+                          <th className="px-2 py-2 font-semibold">MAE</th>
+                          <th className="px-2 py-2 font-semibold">AIC</th>
+                          <th className="px-2 py-2 font-semibold">BIC</th>
+                          <th className="px-2 py-2 font-semibold">F1</th>
+                          <th className="px-2 py-2 font-semibold">N</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {comparisonQuery.data.models.map((model) => {
+                          const primaryMetric = getComparisonPrimaryMetric(model);
+
+                          return (
+                            <tr key={model.model_id}>
+                              <td className="px-2 py-2 font-medium text-slate-800">{model.model_type}</td>
+                              <td className="px-2 py-2 text-slate-700">
+                                {primaryMetric.label}: {formatComparisonMetric(primaryMetric.value)}
+                              </td>
+                              <td className="px-2 py-2 text-slate-700">{formatComparisonMetric(model.rmse)}</td>
+                              <td className="px-2 py-2 text-slate-700">{formatComparisonMetric(model.mae)}</td>
+                              <td className="px-2 py-2 text-slate-700">{formatComparisonMetric(model.aic)}</td>
+                              <td className="px-2 py-2 text-slate-700">{formatComparisonMetric(model.bic)}</td>
+                              <td className="px-2 py-2 text-slate-700">{formatComparisonMetric(model.f1)}</td>
+                              <td className="px-2 py-2 text-slate-700">{model.n_observations.toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               ) : null}
 
               {isOlsModel ? (

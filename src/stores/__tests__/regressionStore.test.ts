@@ -14,6 +14,11 @@ describe("regressionStore", () => {
     expect(state.independents).toEqual([]);
     expect(state.trainTestSplit).toBe(1);
     expect(state.missingStrategy).toBe("listwise");
+    expect(state.alpha).toBe(1);
+    expect(state.l1Ratio).toBe(0.5);
+    expect(state.polynomialDegree).toBe(1);
+    expect(state.maxDepth).toBeNull();
+    expect(state.nEstimators).toBe(100);
     expect(state.lastResult).toBeNull();
     expect(state.isModelFitted).toBe(false);
   });
@@ -49,6 +54,9 @@ describe("regressionStore", () => {
       f_pvalue: null,
       aic: null,
       bic: null,
+      rmse: null,
+      mae: null,
+      feature_importances: null,
       n_observations: 100,
       n_train: 100,
       n_test: null,
@@ -76,19 +84,29 @@ describe("regressionStore", () => {
 
   it("hydrates regression config", () => {
     useRegressionStore.getState().hydrateRegression({
-      modelType: "logistic",
+      modelType: "elastic_net",
       dependent: "target",
       independents: ["x1", "x2"],
       trainTestSplit: 0.7,
       missingStrategy: "mean_imputation",
+      alpha: 0.25,
+      l1Ratio: 0.8,
+      polynomialDegree: 3,
+      maxDepth: 4,
+      nEstimators: 25,
     });
 
     const state = useRegressionStore.getState();
-    expect(state.modelType).toBe("logistic");
+    expect(state.modelType).toBe("elastic_net");
     expect(state.dependent).toBe("target");
     expect(state.independents).toEqual(["x1", "x2"]);
     expect(state.trainTestSplit).toBe(0.7);
     expect(state.missingStrategy).toBe("mean_imputation");
+    expect(state.alpha).toBe(0.25);
+    expect(state.l1Ratio).toBe(0.8);
+    expect(state.polynomialDegree).toBe(3);
+    expect(state.maxDepth).toBe(4);
+    expect(state.nEstimators).toBe(25);
     expect(state.isModelFitted).toBe(false);
     expect(state.lastResult).toBeNull();
   });

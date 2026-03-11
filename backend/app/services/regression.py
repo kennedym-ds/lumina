@@ -7,7 +7,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import ElasticNet, Lasso, Ridge
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.tree import DecisionTreeRegressor
 
 from app.services.missing_values import apply_missing_strategy
 
@@ -80,6 +85,70 @@ def _coefficient_rows(
     return rows
 
 
+def _sklearn_coefficient_rows(
+    intercept: float | None,
+    coefficients: np.ndarray,
+    feature_names: list[str],
+) -> list[dict[str, float | str | None]]:
+    rows: list[dict[str, float | str | None]] = []
+
+    if intercept is not None:
+        rows.append(
+            {
+                "variable": "const",
+                "coefficient": intercept,
+                "std_error": None,
+                "t_stat": None,
+                "z_stat": None,
+                "p_value": None,
+                "ci_lower": None,
+                "ci_upper": None,
+            }
+        )
+
+    for name, coefficient in zip(feature_names, coefficients, strict=False):
+        rows.append(
+            {
+                "variable": str(name),
+                "coefficient": _to_float(coefficient),
+                "std_error": None,
+                "t_stat": None,
+                "z_stat": None,
+                "p_value": None,
+                "ci_lower": None,
+                "ci_upper": None,
+            }
+        )
+
+    return rows
+
+
+def _feature_importance_rows(
+    feature_names: list[str],
+    importances: np.ndarray,
+) -> tuple[list[dict[str, float | str | None]], list[dict[str, float | str]]]:
+    coefficient_rows: list[dict[str, float | str | None]] = []
+    feature_rows: list[dict[str, float | str]] = []
+
+    for name, importance in zip(feature_names, importances, strict=False):
+        importance_value = float(importance)
+        coefficient_rows.append(
+            {
+                "variable": str(name),
+                "coefficient": importance_value,
+                "std_error": None,
+                "t_stat": None,
+                "z_stat": None,
+                "p_value": None,
+                "ci_lower": None,
+                "ci_upper": None,
+            }
+        )
+        feature_rows.append({"feature": str(name), "importance": importance_value})
+
+    return coefficient_rows, feature_rows
+
+
 def _prepare_design_matrix(
     df: pd.DataFrame,
     dependent: str,
@@ -97,26 +166,207 @@ def _prepare_design_matrix(
     return cleaned_df, y, X, warnings
 
 
+def _ensure_numeric_target(y: pd.Series, model_type: str) -> None:
+    if not pd.api.types.is_numeric_dtype(y):
+        raise ValueError(f"{model_type} requires a numeric dependent variable")
+
+
+def _apply_polynomial_features(
+    X: pd.DataFrame,
+    warnings: list[str],
+    poly_degree: int,
+) -> tuple[pd.DataFrame, list[str]]:
+    feature_names = [str(column) for column in X.columns]
+    if poly_degree <= 1:
+        return X, feature_names
+
+    polynomial = PolynomialFeatures(degree=poly_degree, include_bias=False)
+    transformed = polynomial.fit_transform(X)
+    feature_names = [str(name) for name in polynomial.get_feature_names_out(feature_names)]
+    warnings.append(f"Expanded independent variables to polynomial degree {poly_degree}")
+
+    transformed_df = pd.DataFrame(transformed, columns=feature_names, index=X.index)
+    return transformed_df, feature_names
+
+
+def _compute_regression_error_metrics(y_true: Any, y_pred: Any) -> tuple[float | None, float | None]:
+    if y_true is None or y_pred is None:
+        return None, None
+
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    mae = mean_absolute_error(y_true, y_pred)
+    return _to_float(rmse), _to_float(mae)
+
+
+def _fit_regularized_regression(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    *,
+    model_type: str,
+    estimator: Any,
+    poly_degree: int,
+) -> dict[str, Any]:
+    cleaned_df, y, X, warnings = _prepare_design_matrix(df, dependent, independents, missing_strategy)
+    X_model, feature_names = _apply_polynomial_features(X, warnings, poly_degree)
+
+    if train_split < 1.0:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_model,
+            y,
+            train_size=train_split,
+            random_state=42,
+        )
+    else:
+        X_train, y_train = X_model, y
+        X_test, y_test = None, None
+
+    estimator.fit(X_train, y_train)
+
+    if X_test is not None and y_test is not None:
+        X_eval = X_test
+        y_eval = y_test
+        n_train = int(len(X_train))
+        n_test = int(len(X_test))
+    else:
+        X_eval = X_train
+        y_eval = y_train
+        n_train = None
+        n_test = None
+
+    y_pred = estimator.predict(X_eval)
+    rmse, mae = _compute_regression_error_metrics(y_eval, y_pred)
+    intercept = _to_float(np.ravel(np.asarray(estimator.intercept_))[0])
+    coefficients = _sklearn_coefficient_rows(intercept, np.ravel(np.asarray(estimator.coef_)), feature_names)
+
+    response = {
+        "model_type": model_type,
+        "dependent": dependent,
+        "independents": independents,
+        "coefficients": coefficients,
+        "r_squared": _to_float(estimator.score(X_eval, y_eval)),
+        "adj_r_squared": None,
+        "f_statistic": None,
+        "f_pvalue": None,
+        "aic": None,
+        "bic": None,
+        "rmse": rmse,
+        "mae": mae,
+        "n_observations": int(len(cleaned_df)),
+        "n_train": n_train,
+        "n_test": n_test,
+        "warnings": warnings,
+    }
+
+    return {
+        "response": response,
+        "model_result": estimator,
+        "X_eval": X_eval,
+        "y_eval": y_eval,
+        "y_pred": y_pred,
+    }
+
+
+def _fit_tree_regression(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    *,
+    model_type: str,
+    estimator: Any,
+    poly_degree: int,
+) -> dict[str, Any]:
+    cleaned_df, y, X, warnings = _prepare_design_matrix(df, dependent, independents, missing_strategy)
+    _ensure_numeric_target(y, model_type.replace("_", " ").title())
+
+    X_model, feature_names = _apply_polynomial_features(X, warnings, poly_degree)
+
+    if train_split < 1.0:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_model,
+            y,
+            train_size=train_split,
+            random_state=42,
+        )
+    else:
+        X_train, y_train = X_model, y
+        X_test, y_test = None, None
+
+    estimator.fit(X_train, y_train)
+
+    if X_test is not None and y_test is not None:
+        X_eval = X_test
+        y_eval = y_test
+        n_train = int(len(X_train))
+        n_test = int(len(X_test))
+    else:
+        X_eval = X_train
+        y_eval = y_train
+        n_train = None
+        n_test = None
+
+    y_pred = estimator.predict(X_eval)
+    rmse, mae = _compute_regression_error_metrics(y_eval, y_pred)
+    coefficients, feature_importances = _feature_importance_rows(
+        feature_names,
+        np.ravel(np.asarray(estimator.feature_importances_)),
+    )
+
+    response = {
+        "model_type": model_type,
+        "dependent": dependent,
+        "independents": independents,
+        "coefficients": coefficients,
+        "feature_importances": feature_importances,
+        "r_squared": _to_float(estimator.score(X_eval, y_eval)),
+        "adj_r_squared": None,
+        "f_statistic": None,
+        "f_pvalue": None,
+        "aic": None,
+        "bic": None,
+        "rmse": rmse,
+        "mae": mae,
+        "n_observations": int(len(cleaned_df)),
+        "n_train": n_train,
+        "n_test": n_test,
+        "warnings": warnings,
+    }
+
+    return {
+        "response": response,
+        "model_result": estimator,
+        "X_eval": X_eval,
+        "y_eval": y_eval,
+        "y_pred": y_pred,
+    }
+
+
 def fit_ols(
     df: pd.DataFrame,
     dependent: str,
     independents: list[str],
     train_split: float,
     missing_strategy: str,
+    poly_degree: int = 1,
 ) -> dict[str, Any]:
     """Fit OLS regression via statsmodels."""
 
     cleaned_df, y, X, warnings = _prepare_design_matrix(df, dependent, independents, missing_strategy)
+    X_model, _feature_names = _apply_polynomial_features(X, warnings, poly_degree)
 
     if train_split < 1.0:
         X_train, X_test, y_train, y_test = train_test_split(
-            X,
+            X_model,
             y,
             train_size=train_split,
             random_state=42,
         )
     else:
-        X_train, y_train = X, y
+        X_train, y_train = X_model, y
         X_test, y_test = None, None
 
     X_train_const = sm.add_constant(X_train, has_constant="add")
@@ -136,6 +386,8 @@ def fit_ols(
         n_test = None
 
     coefficients = _coefficient_rows(model, model.tvalues, "t_stat")
+    y_pred = model.predict(X_eval)
+    rmse, mae = _compute_regression_error_metrics(y_eval, y_pred)
 
     response = {
         "model_type": "ols",
@@ -148,6 +400,8 @@ def fit_ols(
         "f_pvalue": _to_float(model.f_pvalue),
         "aic": _to_float(model.aic),
         "bic": _to_float(model.bic),
+        "rmse": rmse,
+        "mae": mae,
         "n_observations": int(len(cleaned_df)),
         "n_train": n_train,
         "n_test": n_test,
@@ -159,7 +413,7 @@ def fit_ols(
         "model_result": model,
         "X_eval": X_eval,
         "y_eval": y_eval,
-        "y_pred": model.predict(X_eval),
+        "y_pred": y_pred,
     }
 
 
@@ -252,3 +506,124 @@ def fit_logistic(
         "y_pred": y_pred,
         "labels": labels,
     }
+
+
+def fit_ridge(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    alpha: float = 1.0,
+    poly_degree: int = 1,
+) -> dict[str, Any]:
+    """Fit Ridge regression via scikit-learn."""
+
+    return _fit_regularized_regression(
+        df,
+        dependent,
+        independents,
+        train_split,
+        missing_strategy,
+        model_type="ridge",
+        estimator=Ridge(alpha=alpha),
+        poly_degree=poly_degree,
+    )
+
+
+def fit_lasso(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    alpha: float = 1.0,
+    poly_degree: int = 1,
+) -> dict[str, Any]:
+    """Fit Lasso regression via scikit-learn."""
+
+    return _fit_regularized_regression(
+        df,
+        dependent,
+        independents,
+        train_split,
+        missing_strategy,
+        model_type="lasso",
+        estimator=Lasso(alpha=alpha, max_iter=10000),
+        poly_degree=poly_degree,
+    )
+
+
+def fit_elastic_net(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    alpha: float = 1.0,
+    l1_ratio: float = 0.5,
+    poly_degree: int = 1,
+) -> dict[str, Any]:
+    """Fit Elastic Net regression via scikit-learn."""
+
+    return _fit_regularized_regression(
+        df,
+        dependent,
+        independents,
+        train_split,
+        missing_strategy,
+        model_type="elastic_net",
+        estimator=ElasticNet(alpha=alpha, l1_ratio=l1_ratio, max_iter=10000),
+        poly_degree=poly_degree,
+    )
+
+
+def fit_decision_tree(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    max_depth: int | None = None,
+    poly_degree: int = 1,
+) -> dict[str, Any]:
+    """Fit Decision Tree regression via scikit-learn."""
+
+    return _fit_tree_regression(
+        df,
+        dependent,
+        independents,
+        train_split,
+        missing_strategy,
+        model_type="decision_tree",
+        estimator=DecisionTreeRegressor(max_depth=max_depth, random_state=42),
+        poly_degree=poly_degree,
+    )
+
+
+def fit_random_forest(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    train_split: float,
+    missing_strategy: str,
+    max_depth: int | None = None,
+    n_estimators: int = 100,
+    poly_degree: int = 1,
+) -> dict[str, Any]:
+    """Fit Random Forest regression via scikit-learn."""
+
+    return _fit_tree_regression(
+        df,
+        dependent,
+        independents,
+        train_split,
+        missing_strategy,
+        model_type="random_forest",
+        estimator=RandomForestRegressor(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            random_state=42,
+        ),
+        poly_degree=poly_degree,
+    )

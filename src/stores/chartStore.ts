@@ -19,6 +19,8 @@ const createEmptyChart = (chartType: ChartType = "histogram"): ChartConfig => ({
   y: null,
   color: null,
   facet: null,
+  aggregation: null,
+  values: null,
 });
 
 function cloneCharts(charts: ChartConfig[]): ChartConfig[] {
@@ -44,6 +46,14 @@ function getUpdateLabel(updates: Partial<ChartConfig>): string {
 
   if ("facet" in updates) {
     return "Change Facet";
+  }
+
+  if ("aggregation" in updates) {
+    return "Change Aggregation";
+  }
+
+  if ("values" in updates) {
+    return "Change Values";
   }
 
   return "Update Chart";

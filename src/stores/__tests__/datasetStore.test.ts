@@ -8,6 +8,7 @@ describe("datasetStore", () => {
     file_path: "C:\\data\\sales.csv",
     file_name: "sales.csv",
     file_format: "csv",
+    sheet_name: null,
     row_count: 100,
     column_count: 3,
     columns: [
@@ -31,9 +32,11 @@ describe("datasetStore", () => {
     expect(state.filePath).toBe("C:\\data\\sales.csv");
     expect(state.fileName).toBe("sales.csv");
     expect(state.fileFormat).toBe("csv");
+    expect(state.sheetName).toBeNull();
     expect(state.rowCount).toBe(100);
     expect(state.columnCount).toBe(3);
     expect(state.columns).toHaveLength(1);
+    expect(Array.from(state.excludedColumns)).toEqual([]);
   });
 
   it("updates columns and clears dataset", () => {
@@ -48,8 +51,10 @@ describe("datasetStore", () => {
         unique_count: 50,
       },
     ]);
+    useDatasetStore.getState().toggleColumnExclusion("value");
 
     expect(useDatasetStore.getState().columns[0]?.name).toBe("value");
+    expect(Array.from(useDatasetStore.getState().excludedColumns)).toEqual(["value"]);
 
     useDatasetStore.getState().clearDataset();
 
@@ -58,6 +63,7 @@ describe("datasetStore", () => {
     expect(state.filePath).toBeNull();
     expect(state.fileName).toBeNull();
     expect(state.columns).toEqual([]);
+    expect(Array.from(state.excludedColumns)).toEqual([]);
     expect(state.error).toBeNull();
     expect(state.isLoading).toBe(false);
   });
@@ -79,13 +85,41 @@ describe("datasetStore", () => {
       rowCount: 42,
       columnCount: 7,
       filePath: "C:\\data\\hydrated.csv",
+      sheetName: "Sheet1",
+      excludedColumns: ["category"],
     });
 
     const state = useDatasetStore.getState();
     expect(state.datasetId).toBe("ds_hydrated");
     expect(state.filePath).toBe("C:\\data\\hydrated.csv");
     expect(state.fileName).toBe("hydrated.csv");
+    expect(state.sheetName).toBe("Sheet1");
+    expect(Array.from(state.excludedColumns)).toEqual(["category"]);
     expect(state.rowCount).toBe(42);
     expect(state.columnCount).toBe(7);
+  });
+
+  it("stores selected sheet name from upload responses", () => {
+    useDatasetStore.getState().clearDataset();
+
+    useDatasetStore.getState().setDataset({
+      ...mockUpload,
+      file_name: "workbook.xlsx",
+      file_format: "excel",
+      sheet_name: "Sheet2",
+      sheets: ["Sheet1", "Sheet2"],
+    });
+
+    expect(useDatasetStore.getState().sheetName).toBe("Sheet2");
+  });
+
+  it("toggles column exclusion membership", () => {
+    useDatasetStore.getState().setDataset(mockUpload);
+
+    useDatasetStore.getState().toggleColumnExclusion("id");
+    expect(Array.from(useDatasetStore.getState().excludedColumns)).toEqual(["id"]);
+
+    useDatasetStore.getState().toggleColumnExclusion("id");
+    expect(Array.from(useDatasetStore.getState().excludedColumns)).toEqual([]);
   });
 });

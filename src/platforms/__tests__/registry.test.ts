@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { platforms } from "@/platforms/registry";
 
 describe("platform registry", () => {
-  it("registry has eda and regression entries", () => {
-    expect(platforms.map((entry) => entry.id)).toEqual(expect.arrayContaining(["eda", "regression"]));
+  it("registry exposes tabs in the expected order", () => {
+    expect(platforms.map((entry) => entry.id)).toEqual([
+      "eda",
+      "profiling",
+      "distribution",
+      "inference",
+      "regression",
+      "dashboard",
+    ]);
   });
 
   it("all entries have required fields", () => {

@@ -21,9 +21,8 @@ export function DataTable({ datasetId }: DataTableProps) {
   const totalRowsFromStore = useDatasetStore((state) => state.rowCount);
   const columnsFromStore = useDatasetStore((state) => state.columns);
 
-  const crossFilterIndices = useCrossFilterStore((state) => state.selectedIndices);
-  const crossFilterSet = useMemo(() => new Set(crossFilterIndices), [crossFilterIndices]);
-  const hasCrossFilter = crossFilterIndices.length > 0;
+  const crossFilterRowIds = useCrossFilterStore((state) => state.selectedRowIds);
+  const hasCrossFilter = crossFilterRowIds.size > 0;
 
   const estimatedFirstVisibleRow =
     scrollRef.current !== null
@@ -126,7 +125,7 @@ export function DataTable({ datasetId }: DataTableProps) {
             <div
               key={virtualRow.key}
               className={
-                hasCrossFilter && crossFilterSet.has(absoluteIndex)
+                hasCrossFilter && crossFilterRowIds.has(absoluteIndex)
                   ? "grid border-b border-lumina-200 bg-lumina-100"
                   : hasCrossFilter
                     ? "grid border-b border-slate-100 bg-white opacity-40"

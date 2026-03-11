@@ -11,6 +11,12 @@ const chartTypeOptions: Array<{ type: ChartType; label: string; icon: string }> 
   { type: "box", label: "Box", icon: "📦" },
   { type: "bar", label: "Bar", icon: "📶" },
   { type: "line", label: "Line", icon: "📈" },
+  { type: "violin", label: "Violin", icon: "🎻" },
+  { type: "heatmap", label: "Heatmap", icon: "🔥" },
+  { type: "density", label: "Density", icon: "🌊" },
+  { type: "pie", label: "Pie", icon: "🥧" },
+  { type: "area", label: "Area", icon: "📐" },
+  { type: "qq_plot", label: "Q-Q Plot", icon: "📏" },
 ];
 
 export function ChartTypeSelector({ value, onChange }: ChartTypeSelectorProps) {

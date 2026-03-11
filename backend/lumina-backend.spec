@@ -19,6 +19,7 @@ HIDDEN_IMPORT_ROOTS = [
     "uvicorn",
     "pandas",
     "pyarrow",
+    "scipy",
     "statsmodels",
     "sklearn",
     "openpyxl",

@@ -3,6 +3,10 @@
 import io
 import math
 
+import pandas as pd
+
+from app.models.eda import ChartRequest
+from app.services.chart_builder import DOWNSAMPLE_THRESHOLD, build_chart_figure
 from app.services.downsampling import lttb_downsample
 
 
@@ -67,3 +71,100 @@ def test_downsample_endpoint(client, large_csv_bytes):
     assert payload["downsampled_count"] <= 500
     assert len(payload["x"]) == payload["downsampled_count"]
     assert len(payload["y"]) == payload["downsampled_count"]
+
+
+def test_scatter_auto_downsample():
+    """Scatter charts with many points are automatically downsampled."""
+
+    n = 15_000
+    df = pd.DataFrame({"x": range(n), "y": [float(i * 0.1) for i in range(n)]})
+    req = ChartRequest(chart_type="scatter", x="x", y="y")
+
+    figure, row_count, webgl, warnings, downsampled, displayed = build_chart_figure(df, req)
+
+    assert downsampled is True
+    assert displayed is not None
+    assert displayed <= DOWNSAMPLE_THRESHOLD + 100
+    assert row_count == n
+    assert any("Downsampled" in warning for warning in warnings)
+
+    total_trace_points = sum(len(trace.get("x", [])) for trace in figure["data"])
+    assert total_trace_points < n
+
+
+def test_downsampled_scatter_traces_drop_customdata():
+    """Downsampled scatter traces remove customdata because sampled row IDs are not preserved."""
+
+    n = 15_000
+    df = pd.DataFrame({"x": range(n), "y": [float(i * 0.1) for i in range(n)]})
+    req = ChartRequest(chart_type="scatter", x="x", y="y")
+
+    figure, row_count, webgl, warnings, downsampled, displayed = build_chart_figure(df, req)
+
+    assert row_count == n
+    assert downsampled is True
+    assert displayed is not None
+    for trace in figure["data"]:
+        assert "customdata" not in trace
+
+
+def test_scatter_no_downsample_small():
+    """Small scatter charts are NOT downsampled."""
+
+    df = pd.DataFrame({"x": range(100), "y": range(100)})
+    req = ChartRequest(chart_type="scatter", x="x", y="y")
+
+    figure, row_count, webgl, warnings, downsampled, displayed = build_chart_figure(df, req)
+
+    assert downsampled is False
+    assert displayed is None
+
+
+def test_histogram_never_downsampled():
+    """Histograms are never downsampled even with many rows."""
+
+    n = 15_000
+    df = pd.DataFrame({"x": range(n)})
+    req = ChartRequest(chart_type="histogram", x="x")
+
+    figure, row_count, webgl, warnings, downsampled, displayed = build_chart_figure(df, req)
+
+    assert downsampled is False
+
+
+def test_line_auto_downsample():
+    """Line charts with many points are automatically downsampled."""
+
+    n = 15_000
+    df = pd.DataFrame({"x": range(n), "y": [float(i) for i in range(n)]})
+    req = ChartRequest(chart_type="line", x="x", y="y")
+
+    figure, row_count, webgl, warnings, downsampled, displayed = build_chart_figure(df, req)
+
+    assert downsampled is True
+    assert displayed is not None
+    assert displayed <= DOWNSAMPLE_THRESHOLD + 100
+
+
+def test_downsample_endpoint_with_chart(client):
+    """Integration: scatter chart via API with large dataset returns downsampled flag."""
+
+    n = 15_000
+    csv_data = "x,y\n" + "\n".join(f"{i},{math.sin(i / 100.0)}" for i in range(n))
+    response = client.post(
+        "/api/data/upload",
+        files={"file": ("big.csv", io.BytesIO(csv_data.encode()), "text/csv")},
+    )
+    assert response.status_code == 200
+
+    dataset_id = response.json()["dataset_id"]
+    chart_response = client.post(
+        f"/api/eda/{dataset_id}/chart",
+        json={"chart_type": "scatter", "x": "x", "y": "y"},
+    )
+    assert chart_response.status_code == 200
+
+    body = chart_response.json()
+    assert body["downsampled"] is True
+    assert body["displayed_row_count"] is not None
+    assert body["row_count"] == n

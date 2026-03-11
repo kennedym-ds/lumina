@@ -12,6 +12,8 @@ class ChartRequest(BaseModel):
     color: str | None = None
     facet: str | None = None
     nbins: int | None = None
+    aggregation: str | None = None
+    values: str | None = None
 
 
 class ChartResponse(BaseModel):
@@ -22,6 +24,9 @@ class ChartResponse(BaseModel):
     plotly_figure: dict
     row_count: int
     webgl: bool
+    warnings: list[str] = Field(default_factory=list)
+    downsampled: bool = False
+    displayed_row_count: int | None = None
 
 
 class DownsampleRequest(BaseModel):
@@ -39,3 +44,27 @@ class DownsampleResponse(BaseModel):
     y: list
     original_count: int
     downsampled_count: int
+
+
+class DistributionRequest(BaseModel):
+    """Request payload for distribution comparison traces."""
+
+    column: str
+    group_by: str | None = None
+    n_points: int = Field(default=200, ge=2)
+
+
+class KDETrace(BaseModel):
+    """A single density trace for one group."""
+
+    group: str
+    x: list[float]
+    y: list[float]
+
+
+class DistributionResponse(BaseModel):
+    """Response payload for grouped density comparisons."""
+
+    column: str
+    group_by: str | None = None
+    traces: list[KDETrace]

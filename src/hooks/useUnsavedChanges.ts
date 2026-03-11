@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChartStore } from "@/stores/chartStore";
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useRegressionStore } from "@/stores/regressionStore";
 
@@ -37,6 +38,7 @@ export function useUnsavedChanges(): UnsavedChangesResult {
       useDatasetStore.subscribe(handleChange),
       useChartStore.subscribe(handleChange),
       useCrossFilterStore.subscribe(handleChange),
+      useDashboardStore.subscribe(handleChange),
       useRegressionStore.subscribe(handleChange),
     ];
 

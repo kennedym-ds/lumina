@@ -7,7 +7,19 @@ import { useUndoRedoStore } from "@/stores/undoRedoStore";
 import type { ChartConfig, ChartType } from "@/types/eda";
 
 function isChartType(value: unknown): value is ChartType {
-  return value === "histogram" || value === "scatter" || value === "box" || value === "bar" || value === "line";
+  return (
+    value === "histogram" ||
+    value === "scatter" ||
+    value === "box" ||
+    value === "bar" ||
+    value === "line" ||
+    value === "violin" ||
+    value === "heatmap" ||
+    value === "density" ||
+    value === "pie" ||
+    value === "area" ||
+    value === "qq_plot"
+  );
 }
 
 function toChartConfig(chart: Record<string, unknown>): ChartConfig | null {
@@ -25,6 +37,8 @@ function toChartConfig(chart: Record<string, unknown>): ChartConfig | null {
     y: typeof chart.y === "string" ? chart.y : null,
     color: typeof chart.color === "string" ? chart.color : null,
     facet: typeof chart.facet === "string" ? chart.facet : null,
+    aggregation: typeof chart.aggregation === "string" ? chart.aggregation : null,
+    values: typeof chart.values === "string" ? chart.values : null,
     nbins: typeof chart.nbins === "number" ? chart.nbins : undefined,
   };
 }
@@ -50,15 +64,15 @@ function restoreView(view: ViewSchema) {
   useChartStore.getState().hydrateCharts(charts, view.active_chart_id);
 
   const crossFilterStore = useCrossFilterStore.getState();
-  const selectedIndices = Array.isArray(view.cross_filter?.selected_indices)
+  const selectedRowIds = Array.isArray(view.cross_filter?.selected_indices)
     ? view.cross_filter.selected_indices.filter((value): value is number => typeof value === "number")
     : [];
 
   const selectionSource =
     typeof view.cross_filter?.selection_source === "string" ? view.cross_filter.selection_source : "saved-view";
 
-  if (selectedIndices.length > 0) {
-    crossFilterStore.setSelection(selectionSource, selectedIndices);
+  if (selectedRowIds.length > 0) {
+    crossFilterStore.setSelection(selectionSource, selectedRowIds);
   } else {
     crossFilterStore.clearSelection();
   }
@@ -88,6 +102,7 @@ export function FavouritesPanel() {
 
     const chartState = useChartStore.getState();
     const crossFilterState = useCrossFilterStore.getState();
+    const selectedRowIds = Array.from(crossFilterState.selectedRowIds);
 
     try {
       await saveView.mutateAsync({
@@ -99,13 +114,15 @@ export function FavouritesPanel() {
           y: chart.y,
           color: chart.color,
           facet: chart.facet,
+          aggregation: chart.aggregation ?? null,
+          values: chart.values ?? null,
           nbins: chart.nbins ?? null,
         })),
         active_chart_id: chartState.activeChartId,
         cross_filter:
-          crossFilterState.selectedIndices.length > 0
+          selectedRowIds.length > 0
             ? {
-                selected_indices: crossFilterState.selectedIndices,
+                selected_indices: selectedRowIds,
                 selection_source: crossFilterState.selectionSource,
               }
             : null,

@@ -19,6 +19,7 @@ class UploadResponse(BaseModel):
     dataset_id: str
     file_name: str
     file_format: str
+    sheet_name: str | None = None
     row_count: int
     column_count: int
     columns: list[ColumnInfo]
@@ -88,9 +89,27 @@ class ColumnConfigRequest(BaseModel):
     columns: list[ColumnConfigItem]
 
 
+class CastColumnRequest(BaseModel):
+    """Request to cast a single column to a target dtype."""
+
+    column: str
+    target_dtype: str
+
+
 class ColumnConfigResponse(BaseModel):
     ok: bool = True
     columns: list[ColumnInfo]
+
+
+class SampleResponse(BaseModel):
+    """Response for sampled dataset rows."""
+
+    columns: list[str]
+    dtypes: list[str]
+    data: list[list]
+    row_count: int
+    total_rows: int
+    method: str
 
 
 class SheetsResponse(BaseModel):

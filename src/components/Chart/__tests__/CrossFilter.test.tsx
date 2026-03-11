@@ -34,7 +34,7 @@ describe("ResetSelectionButton", () => {
     await userEvent.click(button);
 
     const state = useCrossFilterStore.getState();
-    expect(state.selectedIndices).toEqual([]);
+    expect(state.selectedRowIds).toEqual(new Set());
     expect(state.selectionSource).toBeNull();
   });
 });

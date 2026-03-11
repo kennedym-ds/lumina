@@ -11,6 +11,7 @@ export interface UploadResponse {
   file_path?: string;
   file_name: string;
   file_format: string;
+  sheet_name?: string | null;
   row_count: number;
   column_count: number;
   columns: ColumnInfo[];
@@ -60,6 +61,13 @@ export interface ColumnConfigItem {
   dtype?: string;
   excluded?: boolean;
   rename?: string;
+}
+
+export type CastTargetDtype = "numeric" | "categorical" | "datetime" | "text";
+
+export interface CastColumnRequest {
+  column: string;
+  target_dtype: CastTargetDtype;
 }
 
 export interface ColumnConfigResponse {

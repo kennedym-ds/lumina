@@ -3,6 +3,25 @@ import type { ChangeEvent } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { UploadResponse } from "@/types/data";
 
+const SUPPORTED_FILE_TYPES = [
+  "csv",
+  "tsv",
+  "tab",
+  "json",
+  "xlsx",
+  "xls",
+  "parquet",
+  "db",
+  "sqlite",
+  "sqlite3",
+  "feather",
+  "arrow",
+] as const;
+
+const ACCEPT_ATTRIBUTE = SUPPORTED_FILE_TYPES.map((extension) => `.${extension}`).join(",");
+const SUPPORTED_FORMATS_LABEL =
+  "Supports .csv, .tsv, .tab, .json, .xlsx, .xls, .parquet, .db, .sqlite, .sqlite3, .feather, and .arrow.";
+
 interface ImportDialogProps {
   onUpload: (file: File, sheet?: string) => Promise<UploadResponse>;
   isUploading: boolean;
@@ -71,7 +90,7 @@ export function ImportDialog({
         filters: [
           {
             name: "Data files",
-            extensions: ["csv", "tsv", "xlsx", "xls", "parquet"],
+            extensions: [...SUPPORTED_FILE_TYPES],
           },
         ],
       });
@@ -109,22 +128,25 @@ export function ImportDialog({
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.tsv,.xlsx,.xls,.parquet"
+        accept={ACCEPT_ATTRIBUTE}
         className="hidden"
         onChange={handleInputChange}
       />
 
-      <button
-        type="button"
-        onClick={openNativePicker}
-        disabled={isUploading}
-        className={
-          buttonClassName ??
-          "inline-flex items-center rounded-md bg-lumina-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-lumina-800 disabled:cursor-not-allowed disabled:opacity-60"
-        }
-      >
-        {isUploading ? "Uploading..." : buttonLabel}
-      </button>
+      <div>
+        <button
+          type="button"
+          onClick={openNativePicker}
+          disabled={isUploading}
+          className={
+            buttonClassName ??
+            "inline-flex items-center rounded-md bg-lumina-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-lumina-800 disabled:cursor-not-allowed disabled:opacity-60"
+          }
+        >
+          {isUploading ? "Uploading..." : buttonLabel}
+        </button>
+        <p className="mt-1 text-xs text-slate-500">{SUPPORTED_FORMATS_LABEL}</p>
+      </div>
 
       {sheets.length > 0 ? (
         <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import type {
   DiagnosticsResponse,
   MissingCheckRequest,
   MissingValueReport,
+  ModelComparisonResponse,
   RegressionRequest,
   RegressionResponse,
   RocResponse,
@@ -59,6 +60,20 @@ export function useRoc(datasetId: string | null, enabled: boolean) {
       }
 
       return apiClient.get(`/api/model/${datasetId}/roc`);
+    },
+    enabled: enabled && !!datasetId,
+  });
+}
+
+export function useModelComparison(datasetId: string | null, enabled: boolean) {
+  return useQuery<ModelComparisonResponse>({
+    queryKey: ["model-comparison", datasetId],
+    queryFn: () => {
+      if (!datasetId) {
+        throw new Error("Dataset is required.");
+      }
+
+      return apiClient.get(`/api/model/${datasetId}/comparison`);
     },
     enabled: enabled && !!datasetId,
   });

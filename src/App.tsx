@@ -3,6 +3,7 @@ import { ApiError } from "@/api/client";
 import { useUploadFile } from "@/api/data";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { FileDropZone } from "@/components/Import/FileDropZone";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import type { UploadResponse } from "@/types/data";
 
@@ -18,6 +19,7 @@ function MainRoute() {
 
     try {
       const response = await uploadMutation.mutateAsync({ file, sheet });
+      useDashboardStore.getState().clearDashboard();
       setDataset(response);
       return response;
     } catch (error) {

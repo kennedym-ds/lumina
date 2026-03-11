@@ -24,6 +24,7 @@ export function SaveViewButton() {
 
     const chartState = useChartStore.getState();
     const crossFilterState = useCrossFilterStore.getState();
+    const selectedRowIds = Array.from(crossFilterState.selectedRowIds);
 
     try {
       await saveView.mutateAsync({
@@ -35,13 +36,15 @@ export function SaveViewButton() {
           y: chart.y,
           color: chart.color,
           facet: chart.facet,
+          aggregation: chart.aggregation ?? null,
+          values: chart.values ?? null,
           nbins: chart.nbins ?? null,
         })),
         active_chart_id: chartState.activeChartId,
         cross_filter:
-          crossFilterState.selectedIndices.length > 0
+          selectedRowIds.length > 0
             ? {
-                selected_indices: crossFilterState.selectedIndices,
+                selected_indices: selectedRowIds,
                 selection_source: crossFilterState.selectionSource,
               }
             : null,

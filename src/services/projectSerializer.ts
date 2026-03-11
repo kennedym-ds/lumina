@@ -1,5 +1,6 @@
 import { useChartStore } from "@/stores/chartStore";
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useRegressionStore } from "@/stores/regressionStore";
 import type { ProjectSchema } from "@/types/project";
@@ -12,15 +13,20 @@ export function serializeProject(): ProjectSchema | null {
 
   const charts = useChartStore.getState();
   const cf = useCrossFilterStore.getState();
+  const dashboard = useDashboardStore.getState();
   const reg = useRegressionStore.getState();
+  const excludedColumns = Array.from(ds.excludedColumns).sort((left, right) => left.localeCompare(right));
+  const selectedRowIds = Array.from(cf.selectedRowIds);
 
   return {
-    version: "1.0",
+    version: "1.1",
     file_path: ds.filePath ?? "",
     file_name: ds.fileName ?? "",
     file_format: ds.fileFormat ?? "csv",
-    sheet_name: null,
-    column_config: [],
+    sheet_name: ds.sheetName ?? null,
+    column_config: excludedColumns.map((columnName) => ({ name: columnName, excluded: true })),
+    saved_views: [],
+    excluded_columns: excludedColumns,
     charts: charts.charts.map((chart) => ({
       chart_id: chart.chartId,
       chart_type: chart.chartType,
@@ -28,20 +34,35 @@ export function serializeProject(): ProjectSchema | null {
       y: chart.y,
       color: chart.color,
       facet: chart.facet,
+      aggregation: chart.aggregation ?? null,
+      values: chart.values ?? null,
       nbins: chart.nbins ?? null,
     })),
     active_chart_id: charts.activeChartId,
+    dashboard_panels: dashboard.panels.map((panel) => ({
+      id: panel.id,
+      chart_id: panel.chartId,
+      x: panel.x,
+      y: panel.y,
+      w: panel.w,
+      h: panel.h,
+    })),
     regression: {
       model_type: reg.modelType,
       dependent: reg.dependent,
       independents: reg.independents,
       train_test_split: reg.trainTestSplit,
       missing_strategy: reg.missingStrategy,
+      alpha: reg.alpha,
+      l1_ratio: reg.l1Ratio,
+      polynomial_degree: reg.polynomialDegree,
+      max_depth: reg.maxDepth,
+      n_estimators: reg.nEstimators,
     },
     cross_filter:
-      cf.selectedIndices.length > 0
+      selectedRowIds.length > 0
         ? {
-            selected_indices: cf.selectedIndices,
+            selected_indices: selectedRowIds,
             selection_source: cf.selectionSource,
           }
         : null,

@@ -1,6 +1,7 @@
 import { useLoadProject } from "@/api/project";
 import { useChartStore } from "@/stores/chartStore";
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
+import { useDashboardStore } from "@/stores/dashboardStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useRegressionStore } from "@/stores/regressionStore";
 import type { ColumnInfo } from "@/types/data";
@@ -48,7 +49,9 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
         columns: response.columns as unknown as ColumnInfo[],
         rowCount: response.row_count,
         columnCount: response.column_count,
+        sheetName: response.project.sheet_name,
         filePath: response.project.file_path,
+        excludedColumns: response.project.excluded_columns,
       });
 
       const hydratedCharts: ChartConfig[] = response.project.charts.map((chart) => ({
@@ -58,10 +61,22 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
         y: chart.y,
         color: chart.color,
         facet: chart.facet,
+        aggregation: typeof chart.aggregation === "string" ? chart.aggregation : null,
+        values: typeof chart.values === "string" ? chart.values : null,
         nbins: chart.nbins ?? undefined,
       }));
 
       useChartStore.getState().hydrateCharts(hydratedCharts, response.project.active_chart_id);
+      useDashboardStore.getState().hydrate(
+        (response.project.dashboard_panels ?? []).map((panel) => ({
+          id: panel.id,
+          chartId: panel.chart_id,
+          x: panel.x,
+          y: panel.y,
+          w: panel.w,
+          h: panel.h,
+        })),
+      );
 
       const regressionStore = useRegressionStore.getState();
       regressionStore.reset();
@@ -73,6 +88,11 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
           independents: regression.independents,
           trainTestSplit: regression.train_test_split,
           missingStrategy: regression.missing_strategy,
+          alpha: regression.alpha ?? 1,
+          l1Ratio: regression.l1_ratio ?? 0.5,
+          polynomialDegree: regression.polynomial_degree ?? 1,
+          maxDepth: regression.max_depth ?? null,
+          nEstimators: regression.n_estimators ?? 100,
         });
       }
 

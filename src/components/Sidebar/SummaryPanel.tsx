@@ -20,11 +20,13 @@ function formatNumber(value?: number): string {
 export function SummaryPanel() {
   const datasetId = useDatasetStore((state) => state.datasetId);
   const fileName = useDatasetStore((state) => state.fileName);
-  const rowCount = useDatasetStore((state) => state.rowCount);
-  const columnCount = useDatasetStore((state) => state.columnCount);
+  const storedRowCount = useDatasetStore((state) => state.rowCount);
+  const storedColumnCount = useDatasetStore((state) => state.columnCount);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
 
   const summaryQuery = useSummary(datasetId);
+  const rowCount = summaryQuery.data?.row_count ?? storedRowCount;
+  const columnCount = summaryQuery.data?.column_count ?? storedColumnCount;
 
   const toggleExpanded = (name: string) => {
     setExpandedColumns((previous) => ({

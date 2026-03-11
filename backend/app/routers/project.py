@@ -8,9 +8,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, Response
 
-from app.models.project import ExportRequest, LoadRequest, LoadResponse, SaveRequest
+from app.models.project import ExportRequest, LoadRequest, LoadResponse, ProjectSchema, SaveRequest
 from app.services.export import export_figure
-from app.services.ingestion import build_column_info, load_file
+from app.services.ingestion import apply_column_config, build_column_info, load_file
 from app.services.project import load_project, save_project, validate_data_file
 from app.session import DatasetSession, store
 
@@ -30,12 +30,55 @@ def _require_absolute_path(file_path: str, *, field_name: str) -> Path:
     return path
 
 
+def _current_project_version() -> str:
+    return ProjectSchema.model_fields["version"].default
+
+
+def _select_session_for_project(project: ProjectSchema) -> DatasetSession | None:
+    session_ids = store.list_ids()
+    sessions = [session for dataset_id in session_ids if (session := store.get(dataset_id)) is not None]
+
+    if not sessions:
+        return None
+
+    project_name = Path(project.file_path).name if project.file_path else project.file_name
+    file_name_match: DatasetSession | None = None
+
+    for session in sessions:
+        session_path = Path(session.file_path)
+        if project.file_path and session.file_path == project.file_path:
+            return session
+        if session.file_name == project.file_name or session_path.name == project_name:
+            file_name_match = session
+
+    if file_name_match is not None:
+        return file_name_match
+
+    if len(sessions) == 1:
+        return sessions[0]
+
+    return None
+
+
 @router.post("/save")
 async def save_project_route(request: SaveRequest):
     """Save serialized project state to disk."""
 
     target = _require_absolute_path(request.file_path, field_name="file_path")
-    save_project(request.project, str(target))
+
+    project = request.project.model_copy(update={"version": _current_project_version()})
+    session = _select_session_for_project(project)
+    if session is not None:
+        project = project.model_copy(
+            update={
+                "sheet_name": session.sheet_name or project.sheet_name,
+                "column_config": session.column_config or project.column_config,
+                "saved_views": session.saved_views or project.saved_views,
+                "excluded_columns": sorted(session.excluded_columns) or project.excluded_columns,
+            }
+        )
+
+    save_project(project, str(target))
     return {"status": "ok", "file_path": str(target)}
 
 
@@ -82,7 +125,25 @@ async def load_project_route(request: LoadRequest):
     )
     store.create(session)
 
-    columns = [column.model_dump() for column in build_column_info(dataframe)]
+    if project.excluded_columns:
+        session.excluded_columns = set(project.excluded_columns)
+
+    if project.saved_views:
+        session.saved_views = [dict(view) for view in project.saved_views]
+
+    if project.charts:
+        session.chart_configs = [chart.model_dump(exclude_none=True) for chart in project.charts]
+
+    if project.dashboard_panels:
+        session.dashboard_panels = [panel.model_dump() for panel in project.dashboard_panels]
+
+    if project.regression:
+        session.model_config_dict = project.regression.model_dump(exclude_none=True)
+
+    if project.column_config:
+        apply_column_config(session, project.column_config)
+
+    columns = [column.model_dump() for column in build_column_info(session.active_dataframe)]
 
     return LoadResponse(
         dataset_id=dataset_id,

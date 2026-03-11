@@ -1,22 +1,22 @@
 import { create } from "zustand";
 
 interface CrossFilterState {
-  /** Sorted array of selected point indices from the source chart. */
-  selectedIndices: number[];
+  /** Selected DataFrame row IDs from the source chart. */
+  selectedRowIds: Set<number>;
   /** Chart ID that originated the current selection. */
   selectionSource: string | null;
   /** Set the cross-filter selection from a specific chart. */
-  setSelection: (chartId: string, indices: number[]) => void;
+  setSelection: (chartId: string, rowIds: number[]) => void;
   /** Clear the cross-filter selection. */
   clearSelection: () => void;
 }
 
 export const useCrossFilterStore = create<CrossFilterState>((set) => ({
-  selectedIndices: [],
+  selectedRowIds: new Set(),
   selectionSource: null,
-  setSelection: (chartId, indices) => {
-    const sorted = [...indices].sort((a, b) => a - b);
-    set({ selectedIndices: sorted, selectionSource: chartId });
+  setSelection: (chartId, rowIds) => {
+    const normalized = [...new Set(rowIds)].sort((left, right) => left - right);
+    set({ selectedRowIds: new Set(normalized), selectionSource: chartId });
   },
-  clearSelection: () => set({ selectedIndices: [], selectionSource: null }),
+  clearSelection: () => set({ selectedRowIds: new Set(), selectionSource: null }),
 }));

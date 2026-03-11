@@ -8,6 +8,7 @@ class Settings:
     port: int = 8089
     token: str = ""
     debug: bool = True
+    plugin_dir: str = "plugins"
 
 
 settings = Settings()

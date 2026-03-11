@@ -1,48 +1,40 @@
-# Phase 2B Complete: Frontend Chart Builder & EDA Components
+# Phase 2b Complete: Correlation matrix heatmap
 
-**Completed**: 2026-03-10T00:00:00Z  
-**Implementer**: implementer-agent
+**Completed**: 2026-03-11T13:19:41.5666005+00:00
+**Implementer**: GitHub Copilot (GPT-5.4)
 
-## Changes Made
+## Changes made
 
-| File | Change Type | Description |
-| ---- | ----------- | ----------- |
-| `src/types/eda.ts` | Added | Frontend EDA contracts (`ChartType`, `ChartConfig`, API request/response types, shelf assignment type). |
-| `src/stores/chartStore.ts` | Added | Zustand chart state with `addChart`, `removeChart`, `updateChart`, `setActiveChart`, `clearCharts`, and max-8 guard. |
-| `src/api/eda.ts` | Added | React Query chart hook (`useChartData`) with minimum-field gating and stable query key hashing. |
-| `src/components/ChartBuilder/VariableShelf.tsx` | Added | Droppable shelf UI for X/Y/Color/Facet with assignment chip and remove action. |
-| `src/components/ChartBuilder/DraggableVariable.tsx` | Added | Draggable variable item with dtype icon mapping. |
-| `src/components/ChartBuilder/ChartTypeSelector.tsx` | Added | 5-option chart-type picker with active highlight state. |
-| `src/components/ChartBuilder/ChartPanel.tsx` | Added | Single-chart builder panel composing chart type selector, shelves, and Plotly renderer. |
-| `src/components/Chart/PlotlyChart.tsx` | Added | Plotly renderer wrapper with loading, error, and responsive config support. |
-| `src/components/Chart/ChartGrid.tsx` | Added | Tiled chart grid with add/remove controls and active chart highlighting. |
-| `src/platforms/eda/EdaPlatform.tsx` | Added | Main EDA platform view with global DnD context, draggable variable list, drag overlay, and chart grid wiring. |
-| `src/types/plotly.d.ts` | Added | Type declaration shim for `plotly.js-dist-min`. |
-| `src/components/Layout/AppLayout.tsx` | Updated | Added Data/Charts tab switch while preserving existing sidebar and import controls. |
-| `src/components/ChartBuilder/__tests__/ChartBuilder.test.tsx` | Added | Phase 2B tests covering selector options, type switch state, shelf rendering, grid add button, and chart store behaviors. |
-| `package.json` / `package-lock.json` | Updated | Added DnD + Plotly dependencies and Plotly React typings. |
+| File | Change type | Description |
+|------|-------------|-------------|
+| `backend/app/models/profiling.py` | Updated | Added correlation request/response models for numeric-column matrix computation. |
+| `backend/app/services/profiling.py` | Updated | Added `compute_correlation` with Pearson, Spearman, and Kendall support plus numeric-column filtering and rounded JSON-safe matrix output. |
+| `backend/app/routers/eda.py` | Updated | Added `/api/eda/{dataset_id}/correlation` endpoint with 400 handling for invalid correlation methods. |
+| `backend/tests/test_profiling.py` | Updated | Added service and API coverage for correlation computation and numeric-column filtering. |
+| `src/types/profiling.ts` | Updated | Added shared `CorrelationResponse` typing for the frontend. |
+| `src/api/profiling.ts` | Updated | Added `useCorrelation` React Query hook using the existing authenticated POST client. |
+| `src/platforms/profiling/CorrelationHeatmap.tsx` | Added | Created a dedicated Plotly heatmap component with selectable method, annotations, and loading/error/empty states. |
+| `src/platforms/profiling/ProfilingPlatform.tsx` | Updated | Inserted the new correlation heatmap section between summary cards and column profiles. |
+| `src/platforms/profiling/__tests__/ProfilingPlatform.test.tsx` | Updated | Added a UI test covering heatmap rendering and query-hook usage. |
 
-## Test Results
+## Test results
 
 | Command | Result | Notes |
-| ------- | ------ | ----- |
-| `npm run test` (initial) | ❌ Fail | Environment PATH issue in script shell (`"node" is not recognized`). |
-| `npm run test --script-shell "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"` (first run) | ❌ Fail | 2 failures: DnD context requirement in shelf test + duplicate button query due missing cleanup. |
-| `npm run test --script-shell "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"` (after fixes) | ✅ Pass | 3 files, 12 tests passed. |
-| `npm run type-check --script-shell "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"` | ✅ Pass | `tsc --noEmit` completed successfully. |
-| `npm run test` + `npm run type-check` (exact commands, normalized PATH in-shell) | ✅ Pass | Exit codes: `TEST_EXIT=0`, `TYPE_EXIT=0`. |
+|---------|--------|-------|
+| `backend\.venv\Scripts\python.exe -m pytest tests\test_profiling.py -v` (pre-implementation) | ❌ Fail | Expected red run: `compute_correlation` import was missing. |
+| `C:\Program Files\nodejs\node.exe .\node_modules\vitest\vitest.mjs run src/platforms/profiling/__tests__/ProfilingPlatform.test.tsx` (pre-implementation) | ❌ Fail | Expected red run: `Correlation Matrix` section was not rendered yet. |
+| `backend\.venv\Scripts\python.exe -m pytest tests\test_profiling.py -v` | ✅ Pass | Targeted profiling suite passed: 11 tests. |
+| `C:\Program Files\nodejs\node.exe .\node_modules\vitest\vitest.mjs run src/platforms/profiling/__tests__/ProfilingPlatform.test.tsx` | ✅ Pass | Targeted profiling platform suite passed: 3 tests. |
+| `backend\.venv\Scripts\python.exe -m pytest tests\ -v` | ✅ Pass | Full backend suite passed: 124 tests. |
+| `C:\Program Files\nodejs\node.exe .\node_modules\typescript\bin\tsc --noEmit` | ✅ Pass | TypeScript compile completed with zero reported errors. |
+| `C:\Program Files\nodejs\node.exe .\node_modules\vitest\vitest.mjs run` | ✅ Pass | Full frontend suite passed: 70 tests across 21 files. |
 
-## Dependency / Security Notes
+## Residual risks
 
-- Installed: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `react-plotly.js`, `plotly.js-dist-min`, `@types/react-plotly.js`.
-- `npm install` reported **5 moderate vulnerabilities** in dependency tree (no auto-fix applied in this phase).
+- Wide datasets with many numeric columns will produce dense annotations; the component reduces font size, but readability will still degrade as the matrix grows.
+- Correlation is computed on demand from the active in-memory dataset. If future phases introduce server-side caching or persisted profiling artifacts, this endpoint should reuse them rather than recomputing every time.
+- Constant numeric columns yield `null` values where the statistical method cannot compute a finite correlation; the UI currently renders those cells blank rather than explaining why.
 
-## Residual Risks
+## Next phase
 
-- Shelf compatibility by dtype (e.g., numeric-only recommendations) is not yet enforced client-side.
-- `facet` is exposed in UI/store and request payload, but backend facet rendering support remains limited from Phase 2A.
-- Plotly introduces a larger frontend bundle; lazy-loading/perf tuning can be revisited in later phases.
-
-## Next Phase
-
-Proceed to **Phase 3: Cross-filtering** (selection propagation across charts + table).
+A sensible follow-up is to add richer cell hover text or click-through drilldowns so users can jump from a strong correlation cell directly into a scatter plot or related EDA view.

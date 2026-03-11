@@ -6,6 +6,56 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
+## [2.0.0] — 2026-03-11
+
+### Added
+
+#### Data
+- Parquet and SQLite file import support.
+- Computed columns: arithmetic, log, and z-score transforms on existing columns.
+- Composable row-filter builder with numeric ranges and categorical selections.
+
+#### Visualization
+- Six new chart types: violin, density, pie, area, line, and QQ plot (11 total).
+- Faceting support — split any chart by a categorical variable for small multiples.
+- Dashboard builder — compose multi-panel dashboards with linked charts.
+
+#### Statistical Analysis
+- One-click dataset profiling: per-column histograms, skewness, kurtosis, memory usage, top values.
+- Correlation matrix with Pearson, Spearman, and Kendall methods.
+- Distribution overlays with group-split KDE curves.
+
+#### Inference
+- Hypothesis testing: independent/paired/one-sample t-tests, chi-square, ANOVA.
+- Confidence intervals and effect sizes: Cohen's d, eta-squared, Cramér's V.
+- Bayesian inference: conjugate-prior one-sample and two-sample tests with Bayes factors.
+
+#### Modeling
+- Regularized regression: Ridge, Lasso, and Elastic Net with configurable alpha.
+- Tree-based models: Decision Tree and Random Forest with feature importances.
+- Model comparison history: side-by-side R², RMSE, MAE across all fitted models.
+- Polynomial features support for all linear model types.
+
+#### Reporting & Export
+- Markdown summary report generation with dataset overview and model results.
+- CSV and Excel dataset export.
+- Export menu in toolbar for quick access.
+
+#### Platform
+- Plugin architecture: register custom chart types, transforms, and statistical tests.
+- Cross-platform build scripts (Windows, macOS, Linux).
+- GitHub Actions CI workflow for automated installer builds on tag push.
+- Build documentation at `docs/BUILDING.md`.
+- Showcase screenshot capture script at `e2e/lumina-showcase.mjs`.
+
+### Changed
+- README expanded with full feature inventory and 14 showcase screenshots.
+- `package.json` updated with cross-platform build scripts.
+- `tauri.conf.json` bundle resources updated for cross-platform sidecar paths.
+- PyInstaller spec (`lumina-backend.spec`) updated with scipy hidden imports.
+
+---
+
 ## [1.0.0] — 2026-03-10
 
 ### Added
@@ -60,4 +110,5 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ---
 
+[2.0.0]: https://github.com/kennedym-ds/lumina/releases/tag/v2.0.0
 [1.0.0]: https://github.com/kennedym-ds/lumina/releases/tag/v1.0.0
