@@ -5,6 +5,8 @@ Single-session design — only one dataset active at startup,
 supporting multiple datasets for future multi-tab work.
 """
 
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -29,7 +31,12 @@ class DatasetSession:
     active_filters: list[FilterRule] = field(default_factory=list)
     sheet_name: str | None = None
     model_result: Any = None
+    fitted_model: Any = None
+    feature_names: list[str] | None = None
+    label_encoders: dict[str, list[Any]] | None = None
+    predictor_dtypes: dict[str, str] | None = None
     model_config_dict: dict[str, Any] = field(default_factory=dict)
+    model_result_payload: dict[str, Any] | None = None
     model_predictions: dict[str, Any] = field(default_factory=dict)
     model_history: list[dict[str, Any]] = field(default_factory=list)
     chart_configs: list[dict[str, Any]] = field(default_factory=list)
@@ -43,8 +50,14 @@ class DatasetSession:
         """Reset derived analysis artifacts after a dataset mutation."""
 
         self.model_result = None
+        self.fitted_model = None
+        self.feature_names = None
+        self.label_encoders = None
+        self.predictor_dtypes = None
         self.model_config_dict = {}
+        self.model_result_payload = None
         self.model_predictions = {}
+        self.model_history = []
         self.chart_configs = []
         self.dashboard_panels = []
         self.inference_results = []

@@ -74,6 +74,105 @@ export interface CIResponse {
   std_error: number;
 }
 
+export interface TukeyHSDRequest {
+  numeric_column: string;
+  group_column: string;
+  alpha?: number;
+}
+
+export interface TukeyHSDComparison {
+  group_a: string;
+  group_b: string;
+  mean_difference: number;
+  adjusted_p_value: number;
+  ci_lower: number;
+  ci_upper: number;
+  reject_null: boolean;
+}
+
+export interface TukeyHSDResponse {
+  alpha: number;
+  group_means: Record<string, number>;
+  group_sizes: Record<string, number>;
+  comparisons: TukeyHSDComparison[];
+}
+
+export interface MannWhitneyRequest {
+  numeric_column: string;
+  group_column: string;
+  group_a?: string | null;
+  group_b?: string | null;
+  alternative?: AlternativeHypothesis;
+}
+
+export interface MannWhitneyResponse {
+  statistic: number;
+  p_value: number;
+  group_a: string;
+  group_b: string;
+  median_a: number;
+  median_b: number;
+  n_a: number;
+  n_b: number;
+  alternative: AlternativeHypothesis;
+}
+
+export interface WilcoxonRequest {
+  column_a: string;
+  column_b: string;
+  alternative?: AlternativeHypothesis;
+}
+
+export interface WilcoxonResponse {
+  statistic: number;
+  p_value: number;
+  n_pairs: number;
+  median_difference: number;
+  alternative: AlternativeHypothesis;
+}
+
+export interface KruskalRequest {
+  numeric_column: string;
+  group_column: string;
+}
+
+export interface KruskalResponse {
+  statistic: number;
+  p_value: number;
+  df: number;
+  group_medians: Record<string, number>;
+  group_sizes: Record<string, number>;
+}
+
+export interface NormalityRequest {
+  column: string;
+  alpha?: number;
+}
+
+export interface NormalityTestResult {
+  statistic: number | null;
+  p_value: number | null;
+  reject_null: boolean | null;
+  ran: boolean;
+  reason: string | null;
+}
+
+export interface AndersonDarlingResult {
+  statistic: number;
+  critical_values: Record<string, number>;
+  reject_null: boolean;
+  significance_level: number;
+}
+
+export interface NormalityResponse {
+  column: string;
+  n: number;
+  alpha: number;
+  shapiro: NormalityTestResult;
+  anderson_darling: AndersonDarlingResult;
+  lilliefors: NormalityTestResult;
+}
+
 export interface BayesianOneSampleRequest {
   column: string;
   prior_mu?: number;
@@ -108,4 +207,68 @@ export interface BayesianTwoSampleResponse {
   prob_greater_than_zero: number;
   group_a: BayesianOneSampleResponse;
   group_b: BayesianOneSampleResponse;
+}
+
+export interface PowerAnalysisRequest {
+  analysis_type: "ttest" | "anova";
+  solve_for: "sample_size" | "power";
+  effect_size: number;
+  alpha?: number;
+  power?: number;
+  sample_size_per_group?: number;
+  ratio?: number;
+  k_groups?: number;
+  alternative?: AlternativeHypothesis;
+}
+
+export interface PowerAnalysisResponse {
+  analysis_type: "ttest" | "anova";
+  solve_for: "sample_size" | "power";
+  effect_size: number;
+  alpha: number;
+  power: number;
+  sample_size_per_group: number;
+  total_sample_size: number;
+  ratio: number | null;
+  k_groups: number | null;
+  alternative: AlternativeHypothesis | null;
+}
+
+// --- Repeated-Measures ANOVA ---
+
+export interface RepeatedMeasuresAnovaRequest {
+  subject_column: string;
+  within_column: string;
+  dependent_column: string;
+}
+
+export interface RepeatedMeasuresAnovaResponse {
+  f_statistic: number;
+  p_value: number;
+  df_num: number;
+  df_den: number;
+  n_subjects: number;
+  n_conditions: number;
+  reject_null: boolean;
+}
+
+// --- Factorial ANOVA ---
+
+export interface FactorialAnovaRequest {
+  dependent_column: string;
+  factors: string[];
+}
+
+export interface FactorialAnovaFactor {
+  source: string;
+  sum_sq: number;
+  df: number;
+  f_statistic: number;
+  p_value: number;
+}
+
+export interface FactorialAnovaResponse {
+  table: FactorialAnovaFactor[];
+  n_observations: number;
+  reject_any: boolean;
 }

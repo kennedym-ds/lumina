@@ -1,10 +1,12 @@
-import type { RegressionMissingStrategy, RegressionModelType } from "@/types/regression";
+import { useEffect, useMemo, useState } from "react";
+import type { DataValidationWarning, RegressionMissingStrategy, RegressionModelType } from "@/types/regression";
 
 interface ModelConfigPanelProps {
   columns: string[];
   modelType: RegressionModelType;
   dependent: string | null;
   independents: string[];
+  interactionTerms: string[][];
   trainTestSplit: number;
   missingStrategy: RegressionMissingStrategy;
   alpha: number;
@@ -12,10 +14,15 @@ interface ModelConfigPanelProps {
   polynomialDegree: number;
   maxDepth: number | null;
   nEstimators: number;
+  learningRate: number;
+  cvEnabled: boolean;
+  cvFolds: number;
+  validationWarnings: DataValidationWarning[];
   isBusy: boolean;
   onModelTypeChange: (value: RegressionModelType) => void;
   onDependentChange: (value: string | null) => void;
   onIndependentToggle: (column: string, checked: boolean) => void;
+  onInteractionTermsChange: (terms: string[][]) => void;
   onTrainTestSplitChange: (value: number) => void;
   onMissingStrategyChange: (value: RegressionMissingStrategy) => void;
   onAlphaChange: (value: number) => void;
@@ -23,6 +30,10 @@ interface ModelConfigPanelProps {
   onPolynomialDegreeChange: (value: number) => void;
   onMaxDepthChange: (value: number | null) => void;
   onNEstimatorsChange: (value: number) => void;
+  onLearningRateChange: (value: number) => void;
+  onCvEnabledChange: (value: boolean) => void;
+  onCvFoldsChange: (value: number) => void;
+  onDismissWarning: (index: number) => void;
   onFit: () => void;
 }
 
@@ -34,6 +45,10 @@ const MODEL_OPTIONS: Array<{ value: RegressionModelType; label: string }> = [
   { value: "elastic_net", label: "ElasticNet" },
   { value: "decision_tree", label: "Decision Tree" },
   { value: "random_forest", label: "Random Forest" },
+  { value: "decision_tree_classifier", label: "DT Classifier" },
+  { value: "random_forest_classifier", label: "RF Classifier" },
+  { value: "gradient_boosting", label: "Gradient Boost" },
+  { value: "gradient_boosting_classifier", label: "GB Classifier" },
 ];
 
 function getSplitLabel(value: number): string {
@@ -52,6 +67,7 @@ export function ModelConfigPanel({
   modelType,
   dependent,
   independents,
+  interactionTerms,
   trainTestSplit,
   missingStrategy,
   alpha,
@@ -59,10 +75,15 @@ export function ModelConfigPanel({
   polynomialDegree,
   maxDepth,
   nEstimators,
+  learningRate,
+  cvEnabled,
+  cvFolds,
+  validationWarnings,
   isBusy,
   onModelTypeChange,
   onDependentChange,
   onIndependentToggle,
+  onInteractionTermsChange,
   onTrainTestSplitChange,
   onMissingStrategyChange,
   onAlphaChange,
@@ -70,15 +91,63 @@ export function ModelConfigPanel({
   onPolynomialDegreeChange,
   onMaxDepthChange,
   onNEstimatorsChange,
+  onLearningRateChange,
+  onCvEnabledChange,
+  onCvFoldsChange,
+  onDismissWarning,
   onFit,
 }: ModelConfigPanelProps) {
   const independentCandidates = columns.filter((column) => column !== dependent);
+  const selectedInteractionCandidates = useMemo(
+    () => independentCandidates.filter((column) => independents.includes(column)),
+    [independentCandidates, independents],
+  );
+  const [interactionLeft, setInteractionLeft] = useState("");
+  const [interactionRight, setInteractionRight] = useState("");
+
+  useEffect(() => {
+    const firstOption = selectedInteractionCandidates[0] ?? "";
+    const secondOption = selectedInteractionCandidates.find((column) => column !== firstOption) ?? "";
+
+    setInteractionLeft((current) =>
+      current && selectedInteractionCandidates.includes(current) ? current : firstOption,
+    );
+    setInteractionRight((current) =>
+      current && current !== firstOption && selectedInteractionCandidates.includes(current) ? current : secondOption,
+    );
+  }, [selectedInteractionCandidates]);
+
+  const normalizedCandidate = useMemo(() => {
+    if (!interactionLeft || !interactionRight || interactionLeft === interactionRight) {
+      return null;
+    }
+
+    return [interactionLeft, interactionRight].sort((left, right) => left.localeCompare(right));
+  }, [interactionLeft, interactionRight]);
+
+  const canAddInteraction =
+    normalizedCandidate !== null &&
+    !interactionTerms.some(
+      (term) =>
+        term.length === 2 && term[0] === normalizedCandidate[0] && term[1] === normalizedCandidate[1],
+    );
   const canFit = Boolean(dependent && independents.length > 0 && !isBusy);
   const isRegularizedModel = modelType === "ridge" || modelType === "lasso" || modelType === "elastic_net";
   const isElasticNetModel = modelType === "elastic_net";
-  const isTreeModel = modelType === "decision_tree" || modelType === "random_forest";
-  const isRandomForestModel = modelType === "random_forest";
-  const supportsPolynomialDegree = modelType !== "logistic" && !isTreeModel;
+  const isTreeModel =
+    modelType === "decision_tree" ||
+    modelType === "random_forest" ||
+    modelType === "decision_tree_classifier" ||
+    modelType === "random_forest_classifier";
+  const isRandomForestModel = modelType === "random_forest" || modelType === "random_forest_classifier";
+  const isGradientBoostingModel = modelType === "gradient_boosting" || modelType === "gradient_boosting_classifier";
+  const isEnsembleModel = isRandomForestModel || isGradientBoostingModel;
+  const isClassifierModel =
+    modelType === "logistic" ||
+    modelType === "decision_tree_classifier" ||
+    modelType === "random_forest_classifier" ||
+    modelType === "gradient_boosting_classifier";
+  const supportsPolynomialDegree = !isClassifierModel && !isTreeModel && !isGradientBoostingModel;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -148,6 +217,92 @@ export function ModelConfigPanel({
           </div>
         </div>
 
+        <div className="space-y-3 rounded-md border border-slate-200 p-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Interaction Terms</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Add pairwise interactions between selected independent variables.
+            </p>
+          </div>
+
+          {selectedInteractionCandidates.length < 2 ? (
+            <p className="text-xs text-slate-500">Select at least two independent variables to define an interaction.</p>
+          ) : (
+            <>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="interaction-left">
+                Interaction term A
+              </label>
+              <select
+                id="interaction-left"
+                aria-label="Interaction term A"
+                value={interactionLeft}
+                onChange={(event) => setInteractionLeft(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-lumina-500 focus:outline-none"
+              >
+                {selectedInteractionCandidates.map((column) => (
+                  <option key={column} value={column}>
+                    {column}
+                  </option>
+                ))}
+              </select>
+
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600" htmlFor="interaction-right">
+                Interaction term B
+              </label>
+              <select
+                id="interaction-right"
+                aria-label="Interaction term B"
+                value={interactionRight}
+                onChange={(event) => setInteractionRight(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-lumina-500 focus:outline-none"
+              >
+                {selectedInteractionCandidates
+                  .filter((column) => column !== interactionLeft)
+                  .map((column) => (
+                    <option key={column} value={column}>
+                      {column}
+                    </option>
+                  ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!normalizedCandidate) {
+                    return;
+                  }
+
+                  onInteractionTermsChange([...interactionTerms, normalizedCandidate]);
+                }}
+                disabled={!canAddInteraction}
+                className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Add Interaction Term
+              </button>
+            </>
+          )}
+
+          {interactionTerms.length > 0 ? (
+            <div className="space-y-2">
+              {interactionTerms.map((term, index) => (
+                <div
+                  key={`${term[0]}-${term[1]}`}
+                  className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                >
+                  <span>{`${term[0]} × ${term[1]}`}</span>
+                  <button
+                    type="button"
+                    onClick={() => onInteractionTermsChange(interactionTerms.filter((_, termIndex) => termIndex !== index))}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <div>
           <label htmlFor="train-test-split" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
             Train/Test Split ({getSplitLabel(trainTestSplit)})
@@ -164,7 +319,35 @@ export function ModelConfigPanel({
           />
         </div>
 
-        {isTreeModel ? (
+        <div className="space-y-2 rounded-md border border-slate-200 p-3">
+          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            <input
+              type="checkbox"
+              checked={cvEnabled}
+              onChange={(event) => onCvEnabledChange(event.target.checked)}
+            />
+            Cross-Validation
+          </label>
+          {cvEnabled ? (
+            <div>
+              <label htmlFor="cv-folds" className="block text-xs text-slate-600">
+                Number of folds (k)
+              </label>
+              <input
+                id="cv-folds"
+                aria-label="Number of folds (k)"
+                type="number"
+                min={2}
+                max={20}
+                value={cvFolds}
+                onChange={(event) => onCvFoldsChange(Number(event.target.value))}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-lumina-500 focus:outline-none"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {isTreeModel || isGradientBoostingModel ? (
           <div className="space-y-3 rounded-md border border-slate-200 p-3">
             <div>
               <label htmlFor="max-depth-input" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -187,7 +370,7 @@ export function ModelConfigPanel({
               <p className="mt-1 text-xs text-slate-500">Leave blank for unlimited depth.</p>
             </div>
 
-            {isRandomForestModel ? (
+            {isEnsembleModel ? (
               <div>
                 <label htmlFor="n-estimators-input" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Number of Trees
@@ -204,6 +387,37 @@ export function ModelConfigPanel({
                 />
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {isGradientBoostingModel ? (
+          <div className="space-y-2 rounded-md border border-slate-200 p-3">
+            <label htmlFor="learning-rate-input" className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Learning Rate
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                aria-label="Learning Rate slider"
+                type="range"
+                min={0.01}
+                max={1}
+                step={0.01}
+                value={learningRate}
+                onChange={(event) => onLearningRateChange(Number(event.target.value))}
+                className="flex-1"
+              />
+              <input
+                id="learning-rate-input"
+                aria-label="Learning Rate"
+                type="number"
+                min={0.01}
+                max={1}
+                step={0.01}
+                value={learningRate}
+                onChange={(event) => onLearningRateChange(Number(event.target.value))}
+                className="w-24 rounded-md border border-slate-300 px-2 py-2 text-sm focus:border-lumina-500 focus:outline-none"
+              />
+            </div>
           </div>
         ) : null}
 
@@ -313,6 +527,30 @@ export function ModelConfigPanel({
             </label>
           </div>
         </fieldset>
+
+        {validationWarnings.length > 0 ? (
+          <div className="space-y-2">
+            {validationWarnings.map((warning, index) => (
+              <div
+                key={`${warning.column}-${warning.warning_type}-${index}`}
+                className={`flex items-start justify-between rounded-md border px-3 py-2 text-xs ${
+                  warning.severity === "warning"
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : "border-blue-200 bg-blue-50 text-blue-800"
+                }`}
+              >
+                <span>{warning.message}</span>
+                <button
+                  type="button"
+                  onClick={() => onDismissWarning(index)}
+                  className="ml-2 text-sm font-bold leading-none opacity-60 hover:opacity-100"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <button
           type="button"

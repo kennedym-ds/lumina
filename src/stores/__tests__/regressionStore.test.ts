@@ -19,8 +19,30 @@ describe("regressionStore", () => {
     expect(state.polynomialDegree).toBe(1);
     expect(state.maxDepth).toBeNull();
     expect(state.nEstimators).toBe(100);
+    expect(state.learningRate).toBe(0.1);
+    expect(state.interactionTerms).toEqual([]);
     expect(state.lastResult).toBeNull();
     expect(state.isModelFitted).toBe(false);
+  });
+
+  it("sets and clears interaction terms", () => {
+    useRegressionStore.getState().addIndependent("x1");
+    useRegressionStore.getState().addIndependent("x2");
+    useRegressionStore.getState().addIndependent("x3");
+
+    useRegressionStore.getState().setInteractionTerms([
+      ["x1", "x2"],
+      ["x2", "x3"],
+    ]);
+
+    expect(useRegressionStore.getState().interactionTerms).toEqual([
+      ["x1", "x2"],
+      ["x2", "x3"],
+    ]);
+
+    useRegressionStore.getState().reset();
+
+    expect(useRegressionStore.getState().interactionTerms).toEqual([]);
   });
 
   it("set and clear dependent", () => {
@@ -71,12 +93,14 @@ describe("regressionStore", () => {
   it("reset clears everything", () => {
     useRegressionStore.getState().setDependent("target");
     useRegressionStore.getState().addIndependent("x1");
+    useRegressionStore.getState().setInteractionTerms([["x1", "x2"]]);
 
     useRegressionStore.getState().reset();
 
     const state = useRegressionStore.getState();
     expect(state.dependent).toBeNull();
     expect(state.independents).toEqual([]);
+    expect(state.interactionTerms).toEqual([]);
     expect(state.lastResult).toBeNull();
     expect(state.isModelFitted).toBe(false);
     expect(state.modelType).toBe("ols");
@@ -94,6 +118,8 @@ describe("regressionStore", () => {
       polynomialDegree: 3,
       maxDepth: 4,
       nEstimators: 25,
+      learningRate: 0.2,
+      interactionTerms: [["x1", "x2"]],
     });
 
     const state = useRegressionStore.getState();
@@ -107,6 +133,8 @@ describe("regressionStore", () => {
     expect(state.polynomialDegree).toBe(3);
     expect(state.maxDepth).toBe(4);
     expect(state.nEstimators).toBe(25);
+    expect(state.learningRate).toBe(0.2);
+    expect(state.interactionTerms).toEqual([["x1", "x2"]]);
     expect(state.isModelFitted).toBe(false);
     expect(state.lastResult).toBeNull();
   });

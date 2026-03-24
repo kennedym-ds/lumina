@@ -11,7 +11,13 @@ from fastapi.responses import JSONResponse, Response
 from app.models.project import ExportRequest, LoadRequest, LoadResponse, ProjectSchema, SaveRequest
 from app.services.export import export_figure
 from app.services.ingestion import apply_column_config, build_column_info, load_file
-from app.services.project import load_project, save_project, validate_data_file
+from app.services.project import (
+    apply_session_state_to_project,
+    load_project,
+    restore_project_state,
+    save_project,
+    validate_data_file,
+)
 from app.session import DatasetSession, store
 
 router = APIRouter(prefix="/api/project", tags=["project"])
@@ -69,14 +75,7 @@ async def save_project_route(request: SaveRequest):
     project = request.project.model_copy(update={"version": _current_project_version()})
     session = _select_session_for_project(project)
     if session is not None:
-        project = project.model_copy(
-            update={
-                "sheet_name": session.sheet_name or project.sheet_name,
-                "column_config": session.column_config or project.column_config,
-                "saved_views": session.saved_views or project.saved_views,
-                "excluded_columns": sorted(session.excluded_columns) or project.excluded_columns,
-            }
-        )
+        project = apply_session_state_to_project(project, session)
 
     save_project(project, str(target))
     return {"status": "ok", "file_path": str(target)}
@@ -137,8 +136,7 @@ async def load_project_route(request: LoadRequest):
     if project.dashboard_panels:
         session.dashboard_panels = [panel.model_dump() for panel in project.dashboard_panels]
 
-    if project.regression:
-        session.model_config_dict = project.regression.model_dump(exclude_none=True)
+    restore_project_state(session, project)
 
     if project.column_config:
         apply_column_config(session, project.column_config)

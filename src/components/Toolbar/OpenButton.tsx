@@ -86,6 +86,7 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
           modelType: regression.model_type,
           dependent: regression.dependent,
           independents: regression.independents,
+          interactionTerms: regression.interaction_terms ?? [],
           trainTestSplit: regression.train_test_split,
           missingStrategy: regression.missing_strategy,
           alpha: regression.alpha ?? 1,
@@ -93,6 +94,10 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
           polynomialDegree: regression.polynomial_degree ?? 1,
           maxDepth: regression.max_depth ?? null,
           nEstimators: regression.n_estimators ?? 100,
+          learningRate: regression.learning_rate ?? 0.1,
+          modelBlob: regression.model_blob ?? null,
+          modelResult: regression.model_result ?? null,
+          modelHistory: regression.model_history ?? [],
         });
       }
 

@@ -1,4 +1,5 @@
 import type { RegressionMissingStrategy, RegressionModelType } from "@/types/regression";
+import type { ModelComparisonEntry, RegressionResponse } from "@/types/regression";
 
 export interface ChartState {
   chart_id: string;
@@ -16,6 +17,7 @@ export interface RegressionState {
   model_type: RegressionModelType;
   dependent: string | null;
   independents: string[];
+  interaction_terms?: string[][];
   train_test_split: number;
   missing_strategy: RegressionMissingStrategy;
   alpha: number;
@@ -23,6 +25,10 @@ export interface RegressionState {
   polynomial_degree: number;
   max_depth: number | null;
   n_estimators: number;
+  learning_rate: number;
+  model_blob?: string;
+  model_result?: RegressionResponse | null;
+  model_history?: ModelComparisonEntry[] | null;
 }
 
 export interface CrossFilterState {

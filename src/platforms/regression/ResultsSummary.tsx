@@ -1,8 +1,15 @@
-import type { RegressionResponse } from "@/types/regression";
+import type { CrossValidationResponse, RegressionResponse } from "@/types/regression";
+
+const CLASSIFIER_MODEL_TYPES = new Set([
+  "logistic",
+  "decision_tree_classifier",
+  "random_forest_classifier",
+  "gradient_boosting_classifier",
+]);
 
 interface ResultsSummaryProps {
   result: RegressionResponse;
-  logisticAccuracy?: number | null;
+  cvResult?: CrossValidationResponse | null;
 }
 
 function formatMetric(value: number | null | undefined, digits = 3): string {
@@ -29,9 +36,12 @@ function pValueClass(pValue: number | null): string {
   return "text-red-700 bg-red-50";
 }
 
-export function ResultsSummary({ result, logisticAccuracy }: ResultsSummaryProps) {
+export function ResultsSummary({ result, cvResult }: ResultsSummaryProps) {
+  const isClassifierModel = CLASSIFIER_MODEL_TYPES.has(result.model_type);
   const statLabel = result.model_type === "logistic" ? "z-stat" : result.model_type === "ols" ? "t-stat" : "stat";
   const hasFeatureImportances = Boolean(result.feature_importances && result.feature_importances.length > 0);
+  const classifierAccuracy = result.accuracy ?? null;
+  const classifierF1 = result.f1 ?? null;
 
   return (
     <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -39,9 +49,15 @@ export function ResultsSummary({ result, logisticAccuracy }: ResultsSummaryProps
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-8">
         <div className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
-          <p className="font-semibold text-slate-600">{result.model_type === "logistic" ? "Accuracy" : "R²"}</p>
-          <p>{result.model_type === "logistic" ? formatMetric(logisticAccuracy) : formatMetric(result.r_squared)}</p>
+          <p className="font-semibold text-slate-600">{isClassifierModel ? "Accuracy" : "R²"}</p>
+          <p>{isClassifierModel ? formatMetric(classifierAccuracy) : formatMetric(result.r_squared)}</p>
         </div>
+        {isClassifierModel ? (
+          <div className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
+            <p className="font-semibold text-slate-600">F1</p>
+            <p>{formatMetric(classifierF1)}</p>
+          </div>
+        ) : null}
         <div className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
           <p className="font-semibold text-slate-600">AIC</p>
           <p>{formatMetric(result.aic)}</p>
@@ -71,6 +87,27 @@ export function ResultsSummary({ result, logisticAccuracy }: ResultsSummaryProps
           <p>{result.n_test == null ? "—" : result.n_test.toLocaleString()}</p>
         </div>
       </div>
+
+      {cvResult ? (
+        <div className="rounded-md border border-slate-200 p-3">
+          <h3 className="mb-2 text-sm font-semibold text-slate-800">Cross-Validation ({cvResult.k}-fold, {cvResult.scoring})</h3>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
+              <p className="font-semibold text-slate-600">Mean Score</p>
+              <p>{formatMetric(cvResult.mean_score)}</p>
+            </div>
+            <div className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700">
+              <p className="font-semibold text-slate-600">Std Dev</p>
+              <p>{formatMetric(cvResult.std_score)}</p>
+            </div>
+          </div>
+          <div className="mt-2">
+            <p className="text-xs text-slate-500">
+              Fold scores: {cvResult.fold_scores.map((score) => formatMetric(score)).join(", ")}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {hasFeatureImportances ? (
         <div>

@@ -59,3 +59,25 @@ export async function downloadExport(datasetId: string, format: ExportFormat): P
 
   triggerDownload(blob, filename);
 }
+
+export async function downloadInferenceReport(datasetId: string, format: "markdown" | "csv" = "markdown"): Promise<void> {
+  const response = await fetch(`${getBaseUrl()}/api/export/${datasetId}/inference-report?fmt=${encodeURIComponent(format)}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.statusText}`);
+  }
+
+  const blob = await response.blob();
+  const ext = format === "csv" ? "csv" : "md";
+  const filename = getFilename(
+    response.headers.get("Content-Disposition"),
+    `inference_report.${ext}`,
+  );
+
+  triggerDownload(blob, filename);
+}

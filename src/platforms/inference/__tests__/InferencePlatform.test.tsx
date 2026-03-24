@@ -13,6 +13,12 @@ const runAnova = vi.fn();
 const runConfidenceInterval = vi.fn();
 const runBayesianOneSample = vi.fn();
 const runBayesianTwoSample = vi.fn();
+const runNormality = vi.fn();
+const runTukeyHsd = vi.fn();
+const runMannWhitney = vi.fn();
+const runWilcoxon = vi.fn();
+const runKruskal = vi.fn();
+const runPowerAnalysis = vi.fn();
 
 vi.mock("@/api/inference", () => ({
   useRunTTest: () => ({ mutateAsync: runTTest, isPending: false, error: null }),
@@ -21,6 +27,18 @@ vi.mock("@/api/inference", () => ({
   useConfidenceInterval: () => ({ mutateAsync: runConfidenceInterval, isPending: false, error: null }),
   useBayesianOneSample: () => ({ mutateAsync: runBayesianOneSample, isPending: false, error: null }),
   useBayesianTwoSample: () => ({ mutateAsync: runBayesianTwoSample, isPending: false, error: null }),
+  useRunNormality: () => ({ mutateAsync: runNormality, isPending: false, error: null }),
+  useRunTukeyHsd: () => ({ mutateAsync: runTukeyHsd, isPending: false, error: null }),
+  useRunMannWhitney: () => ({ mutateAsync: runMannWhitney, isPending: false, error: null }),
+  useRunWilcoxon: () => ({ mutateAsync: runWilcoxon, isPending: false, error: null }),
+  useRunKruskal: () => ({ mutateAsync: runKruskal, isPending: false, error: null }),
+  usePowerAnalysis: () => ({ mutateAsync: runPowerAnalysis, isPending: false, error: null }),
+  useRunRepeatedMeasuresAnova: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useRunFactorialAnova: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+}));
+
+vi.mock("@/api/export", () => ({
+  downloadInferenceReport: vi.fn(),
 }));
 
 function createClient() {
@@ -44,6 +62,12 @@ describe("InferencePlatform", () => {
     runConfidenceInterval.mockReset();
     runBayesianOneSample.mockReset();
     runBayesianTwoSample.mockReset();
+    runNormality.mockReset();
+    runTukeyHsd.mockReset();
+    runMannWhitney.mockReset();
+    runWilcoxon.mockReset();
+    runKruskal.mockReset();
+    runPowerAnalysis.mockReset();
     useDatasetStore.getState().clearDataset();
     useDatasetStore.getState().setDataset({
       dataset_id: "dataset-1",
@@ -71,6 +95,10 @@ describe("InferencePlatform", () => {
     expect(screen.getByRole("button", { name: "Chi-Square" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "ANOVA" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Confidence Interval" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Normality" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Nonparametric" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pairwise" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Power Analysis" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Bayesian One-Sample" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Bayesian Two-Sample" })).toBeTruthy();
     expect(screen.getByLabelText("T-test type")).toBeTruthy();
@@ -91,6 +119,23 @@ describe("InferencePlatform", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confidence Interval" }));
     expect(screen.getByLabelText("Confidence interval column")).toBeTruthy();
     expect(screen.getByLabelText("Confidence level")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Normality" }));
+    expect(screen.getByLabelText("Normality column")).toBeTruthy();
+    expect(screen.getByLabelText("Normality alpha")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nonparametric" }));
+    expect(screen.getByLabelText("Nonparametric test")).toBeTruthy();
+    expect(screen.getByLabelText("Nonparametric value column")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pairwise" }));
+    expect(screen.getByLabelText("Pairwise value column")).toBeTruthy();
+    expect(screen.getByLabelText("Pairwise group column")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Power Analysis" }));
+    expect(screen.getByLabelText("Power test type")).toBeTruthy();
+    expect(screen.getByLabelText("Effect size")).toBeTruthy();
+    expect(screen.getByLabelText("Power mode")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Bayesian One-Sample" }));
     expect(screen.getByLabelText("Bayesian sample column")).toBeTruthy();
@@ -272,5 +317,150 @@ describe("InferencePlatform", () => {
     renderWithQuery(<InferencePlatform />);
 
     expect(screen.getByText("Import a dataset to run statistical inference.")).toBeTruthy();
+  });
+
+  it("runs combined normality testing and renders the summary", async () => {
+    runNormality.mockResolvedValue({
+      column: "score",
+      n: 30,
+      alpha: 0.05,
+      shapiro: {
+        statistic: 0.98,
+        p_value: 0.42,
+        reject_null: false,
+        ran: true,
+        reason: null,
+      },
+      anderson_darling: {
+        statistic: 0.31,
+        critical_values: {
+          "15.0%": 0.521,
+          "10.0%": 0.593,
+          "5.0%": 0.712,
+          "2.5%": 0.83,
+          "1.0%": 0.988,
+        },
+        reject_null: false,
+        significance_level: 0.05,
+      },
+      lilliefors: {
+        statistic: 0.09,
+        p_value: 0.61,
+        reject_null: false,
+        ran: true,
+        reason: null,
+      },
+    });
+
+    renderWithQuery(<InferencePlatform />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Normality" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run Test" }));
+
+    expect(runNormality).toHaveBeenCalledWith({ column: "score", alpha: 0.05 });
+    expect(await screen.findByText("Combined normality summary")).toBeTruthy();
+    expect(await screen.findByText("Shapiro-Wilk")).toBeTruthy();
+    expect(await screen.findByText("Anderson-Darling (5%)")).toBeTruthy();
+    expect(await screen.findByText("Lilliefors")).toBeTruthy();
+  });
+
+  it("runs a Mann-Whitney U test from the nonparametric panel", async () => {
+    runMannWhitney.mockResolvedValue({
+      statistic: 0,
+      p_value: 0.0286,
+      group_a: "A",
+      group_b: "B",
+      median_a: 2.5,
+      median_b: 9.5,
+      n_a: 4,
+      n_b: 4,
+      alternative: "two-sided",
+    });
+
+    renderWithQuery(<InferencePlatform />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Nonparametric" }));
+    fireEvent.change(screen.getByLabelText("Group A label"), { target: { value: "A" } });
+    fireEvent.change(screen.getByLabelText("Group B label"), { target: { value: "B" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run Test" }));
+
+    expect(runMannWhitney).toHaveBeenCalledWith({
+      numeric_column: "score",
+      group_column: "group",
+      group_a: "A",
+      group_b: "B",
+      alternative: "two-sided",
+    });
+    expect(await screen.findByText("Nonparametric test results")).toBeTruthy();
+    expect((await screen.findAllByText("Mann-Whitney U")).length).toBeGreaterThan(0);
+  });
+
+  it("runs Tukey HSD from the pairwise panel and shows adjusted comparisons", async () => {
+    runTukeyHsd.mockResolvedValue({
+      alpha: 0.05,
+      group_means: { A: 6, B: 11, C: 16 },
+      group_sizes: { A: 3, B: 3, C: 3 },
+      comparisons: [
+        {
+          group_a: "A",
+          group_b: "B",
+          mean_difference: 5,
+          adjusted_p_value: 0.0242,
+          ci_lower: 0.75,
+          ci_upper: 9.25,
+          reject_null: true,
+        },
+      ],
+    });
+
+    renderWithQuery(<InferencePlatform />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Pairwise" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run Test" }));
+
+    expect(runTukeyHsd).toHaveBeenCalledWith({
+      numeric_column: "score",
+      group_column: "group",
+      alpha: 0.05,
+    });
+    expect(await screen.findByText("Pairwise comparison results")).toBeTruthy();
+    expect(await screen.findByText("Adjusted p-value")).toBeTruthy();
+    expect(await screen.findByText("Reject H0")).toBeTruthy();
+  });
+
+  it("runs power analysis and renders the results summary", async () => {
+    runPowerAnalysis.mockResolvedValue({
+      analysis_type: "ttest",
+      solve_for: "sample_size",
+      effect_size: 0.5,
+      alpha: 0.05,
+      power: 0.8,
+      sample_size_per_group: 64,
+      total_sample_size: 128,
+      ratio: 1,
+      alternative: "two-sided",
+    });
+
+    renderWithQuery(<InferencePlatform />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Power Analysis" }));
+    fireEvent.change(screen.getByLabelText("Effect size"), { target: { value: "0.5" } });
+    fireEvent.change(screen.getByLabelText("Power mode"), { target: { value: "sample_size" } });
+    fireEvent.change(screen.getByLabelText("Target power"), { target: { value: "0.8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run Test" }));
+
+    expect(runPowerAnalysis).toHaveBeenCalledWith({
+      analysis_type: "ttest",
+      solve_for: "sample_size",
+      effect_size: 0.5,
+      alpha: 0.05,
+      power: 0.8,
+      ratio: 1,
+      alternative: "two-sided",
+    });
+    expect(await screen.findByText("Power analysis summary")).toBeTruthy();
+    expect(await screen.findByText("Solve for")).toBeTruthy();
+    expect(await screen.findByText("Sample size per group")).toBeTruthy();
+    expect(await screen.findByText("128")).toBeTruthy();
   });
 });

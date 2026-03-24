@@ -19,7 +19,7 @@ export function serializeProject(): ProjectSchema | null {
   const selectedRowIds = Array.from(cf.selectedRowIds);
 
   return {
-    version: "1.1",
+    version: "1.2",
     file_path: ds.filePath ?? "",
     file_name: ds.fileName ?? "",
     file_format: ds.fileFormat ?? "csv",
@@ -51,6 +51,7 @@ export function serializeProject(): ProjectSchema | null {
       model_type: reg.modelType,
       dependent: reg.dependent,
       independents: reg.independents,
+      interaction_terms: reg.interactionTerms,
       train_test_split: reg.trainTestSplit,
       missing_strategy: reg.missingStrategy,
       alpha: reg.alpha,
@@ -58,6 +59,10 @@ export function serializeProject(): ProjectSchema | null {
       polynomial_degree: reg.polynomialDegree,
       max_depth: reg.maxDepth,
       n_estimators: reg.nEstimators,
+      learning_rate: reg.learningRate,
+      ...(reg.modelBlob ? { model_blob: reg.modelBlob } : {}),
+      ...(reg.lastResult ? { model_result: reg.lastResult } : {}),
+      ...(reg.modelHistory.length > 0 ? { model_history: reg.modelHistory } : {}),
     },
     cross_filter:
       selectedRowIds.length > 0

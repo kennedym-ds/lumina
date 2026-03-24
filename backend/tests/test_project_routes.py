@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
+import pytest
+
+from app.config import settings
+from app.services import regression as regression_service
 
 
 def _project_payload(data_file_path: str, *, version: str = "1.1") -> dict:
@@ -60,6 +66,12 @@ def _upload_csv(client, csv_bytes: bytes, *, filename: str = "test.csv") -> str:
     return response.json()["dataset_id"]
 
 
+def _fit_regression(client, dataset_id: str, payload: dict):
+    response = client.post(f"/api/model/{dataset_id}/regression", json=payload)
+    assert response.status_code == 200
+    return response
+
+
 def test_save_project(client, tmp_path):
     sample_csv_path = tmp_path / "sample.csv"
     pd.DataFrame({"x": [1, 2, 3], "y": [10, 20, 30]}).to_csv(sample_csv_path, index=False)
@@ -76,7 +88,7 @@ def test_save_project(client, tmp_path):
     assert project_save_path.exists()
 
     parsed = json.loads(project_save_path.read_text(encoding="utf-8"))
-    assert parsed["version"] == "1.1"
+    assert parsed["version"] == "1.2"
     assert parsed["file_name"] == "sample.csv"
     assert parsed["file_format"] == "csv"
     assert parsed["dashboard_panels"] == []
@@ -127,6 +139,244 @@ def test_load_nonexistent_project(client, tmp_path):
     assert response.status_code == 404
 
 
+def test_model_survives_save_load_cycle(client, tmp_path, regression_csv_bytes):
+    sample_csv_path = tmp_path / "regression.csv"
+    sample_csv_path.write_bytes(regression_csv_bytes)
+
+    dataset_id = _upload_csv(client, regression_csv_bytes, filename=sample_csv_path.name)
+    _fit_regression(
+        client,
+        dataset_id,
+        {
+            "model_type": "ridge",
+            "dependent": "y",
+            "independents": ["x1", "x2"],
+        },
+    )
+
+    predict_before = client.post(
+        f"/api/model/{dataset_id}/predict",
+        json={"values": {"x1": 1.0, "x2": 2.0}},
+    )
+    assert predict_before.status_code == 200
+    original_prediction = predict_before.json()["predicted_value"]
+
+    project_save_path = tmp_path / "ridge-save-load.lumina"
+    save_response = _save_project(client, str(project_save_path), _project_payload(str(sample_csv_path)))
+    assert save_response.status_code == 200
+
+    saved_payload = json.loads(project_save_path.read_text(encoding="utf-8"))
+    assert saved_payload["regression"]["model_blob"]
+    assert saved_payload["regression"]["model_result"] is not None
+
+    load_response = _load_project(client, str(project_save_path))
+    assert load_response.status_code == 200
+    new_dataset_id = load_response.json()["dataset_id"]
+
+    predict_after = client.post(
+        f"/api/model/{new_dataset_id}/predict",
+        json={"values": {"x1": 1.0, "x2": 2.0}},
+    )
+    assert predict_after.status_code == 200
+    assert predict_after.json()["predicted_value"] == pytest.approx(original_prediction, abs=1e-10)
+
+
+def test_classifier_model_survives_save_load(client, tmp_path, logistic_csv_bytes):
+    sample_csv_path = tmp_path / "classifier.csv"
+    sample_csv_path.write_bytes(logistic_csv_bytes)
+
+    dataset_id = _upload_csv(client, logistic_csv_bytes, filename=sample_csv_path.name)
+    _fit_regression(
+        client,
+        dataset_id,
+        {
+            "model_type": "random_forest_classifier",
+            "dependent": "target",
+            "independents": ["x1", "x2"],
+            "n_estimators": 50,
+        },
+    )
+
+    predict_before = client.post(
+        f"/api/model/{dataset_id}/predict",
+        json={"values": {"x1": 0.5, "x2": -0.3}},
+    )
+    assert predict_before.status_code == 200
+    original_probabilities = predict_before.json()["probabilities"]
+
+    project_save_path = tmp_path / "classifier-save-load.lumina"
+    save_response = _save_project(client, str(project_save_path), _project_payload(str(sample_csv_path)))
+    assert save_response.status_code == 200
+
+    saved_payload = json.loads(project_save_path.read_text(encoding="utf-8"))
+    assert saved_payload["regression"]["model_blob"]
+
+    load_response = _load_project(client, str(project_save_path))
+    assert load_response.status_code == 200
+    new_dataset_id = load_response.json()["dataset_id"]
+
+    predict_after = client.post(
+        f"/api/model/{new_dataset_id}/predict",
+        json={"values": {"x1": 0.5, "x2": -0.3}},
+    )
+    assert predict_after.status_code == 200
+    assert predict_after.json()["probabilities"] == pytest.approx(original_probabilities)
+
+
+def test_backward_compatible_load_without_model_blob(client, tmp_path, regression_csv_bytes):
+    sample_csv_path = tmp_path / "legacy.csv"
+    sample_csv_path.write_bytes(regression_csv_bytes)
+
+    project_path = tmp_path / "legacy-no-model-blob.lumina"
+    project_path.write_text(
+        json.dumps(
+            {
+                "version": "1.1",
+                "file_path": str(sample_csv_path),
+                "file_name": sample_csv_path.name,
+                "file_format": "csv",
+                "sheet_name": None,
+                "column_config": [],
+                "saved_views": [],
+                "excluded_columns": [],
+                "charts": [],
+                "active_chart_id": None,
+                "dashboard_panels": [],
+                "regression": {
+                    "model_type": "ridge",
+                    "dependent": "y",
+                    "independents": ["x1", "x2"],
+                    "train_test_split": 1.0,
+                    "missing_strategy": "listwise",
+                    "alpha": 1.0,
+                    "l1_ratio": 0.5,
+                    "polynomial_degree": 1,
+                    "max_depth": None,
+                    "n_estimators": 100,
+                    "learning_rate": 0.1,
+                },
+                "cross_filter": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    load_response = _load_project(client, str(project_path))
+    assert load_response.status_code == 200
+    body = load_response.json()
+    assert body["project"]["regression"]["model_type"] == "ridge"
+
+    predict_response = client.post(
+        f"/api/model/{body['dataset_id']}/predict",
+        json={"values": {"x1": 1.0, "x2": 2.0}},
+    )
+    assert predict_response.status_code == 400
+
+
+def test_serialize_model_logs_size_warning(monkeypatch, tmp_path, caplog):
+    key_path = tmp_path / ".model-signing-key"
+    monkeypatch.setattr(settings, "model_signing_key_path", key_path, raising=False)
+    monkeypatch.setattr(regression_service, "MAX_SERIALIZED_MODEL_BYTES", 1)
+
+    session = SimpleNamespace(
+        fitted_model={"weights": list(range(8))},
+        feature_names=["x1", "x2"],
+        label_encoders=None,
+        predictor_dtypes={"x1": "float64", "x2": "float64"},
+        model_predictions={},
+        dataset_id="warning-dataset",
+    )
+
+    with caplog.at_level("WARNING"):
+        blob = regression_service.serialize_model(session)
+
+    assert blob is not None
+    assert "Serialized model for dataset warning-dataset" in caplog.text
+
+
+def test_malformed_model_blob_handled_gracefully(client, tmp_path, regression_csv_bytes, caplog):
+    sample_csv_path = tmp_path / "malformed.csv"
+    sample_csv_path.write_bytes(regression_csv_bytes)
+
+    dataset_id = _upload_csv(client, regression_csv_bytes, filename=sample_csv_path.name)
+    _fit_regression(
+        client,
+        dataset_id,
+        {
+            "model_type": "ols",
+            "dependent": "y",
+            "independents": ["x1", "x2"],
+        },
+    )
+
+    project_save_path = tmp_path / "malformed-model-blob.lumina"
+    save_response = _save_project(client, str(project_save_path), _project_payload(str(sample_csv_path)))
+    assert save_response.status_code == 200
+
+    saved_payload = json.loads(project_save_path.read_text(encoding="utf-8"))
+    saved_payload["regression"]["model_blob"] = "definitely:not-base64"
+    project_save_path.write_text(json.dumps(saved_payload), encoding="utf-8")
+
+    with caplog.at_level("WARNING"):
+        load_response = _load_project(client, str(project_save_path))
+
+    assert load_response.status_code == 200
+    assert "Could not restore model from project file" in caplog.text
+
+    new_dataset_id = load_response.json()["dataset_id"]
+    predict_response = client.post(
+        f"/api/model/{new_dataset_id}/predict",
+        json={"values": {"x1": 1.0, "x2": 2.0}},
+    )
+    assert predict_response.status_code == 400
+    assert predict_response.json()["detail"] == "No fitted model available"
+
+
+def test_tampered_model_blob_rejected(client, tmp_path, regression_csv_bytes, caplog):
+    sample_csv_path = tmp_path / "tampered.csv"
+    sample_csv_path.write_bytes(regression_csv_bytes)
+
+    dataset_id = _upload_csv(client, regression_csv_bytes, filename=sample_csv_path.name)
+    _fit_regression(
+        client,
+        dataset_id,
+        {
+            "model_type": "ols",
+            "dependent": "y",
+            "independents": ["x1", "x2"],
+        },
+    )
+
+    project_save_path = tmp_path / "tampered-model-blob.lumina"
+    save_response = _save_project(client, str(project_save_path), _project_payload(str(sample_csv_path)))
+    assert save_response.status_code == 200
+
+    saved_payload = json.loads(project_save_path.read_text(encoding="utf-8"))
+    model_blob = saved_payload["regression"]["model_blob"]
+    assert ":" in model_blob
+
+    signature, b64data = model_blob.split(":", 1)
+    raw = base64.b64decode(b64data)
+    tampered_tail = b"0" if raw[-1:] != b"0" else b"1"
+    tampered_raw = raw[:-1] + tampered_tail
+    saved_payload["regression"]["model_blob"] = f"{signature}:{base64.b64encode(tampered_raw).decode('ascii')}"
+    project_save_path.write_text(json.dumps(saved_payload), encoding="utf-8")
+
+    with caplog.at_level("WARNING"):
+        load_response = _load_project(client, str(project_save_path))
+
+    assert load_response.status_code == 200
+    assert "Could not restore model from project file" in caplog.text
+
+    new_dataset_id = load_response.json()["dataset_id"]
+    predict_response = client.post(
+        f"/api/model/{new_dataset_id}/predict",
+        json={"values": {"x1": 1.0, "x2": 2.0}},
+    )
+    assert predict_response.status_code == 400
+    assert predict_response.json()["detail"] == "No fitted model available"
+
+
 def test_save_load_roundtrip(client, tmp_path):
     sample_csv_path = tmp_path / "sample.csv"
     pd.DataFrame({"x": [1, 2, 3], "y": [10, 20, 30], "group": ["A", "A", "B"]}).to_csv(
@@ -169,6 +419,7 @@ def test_save_load_roundtrip(client, tmp_path):
         "polynomial_degree": 1,
         "max_depth": None,
         "n_estimators": 100,
+        "learning_rate": 0.1,
     }
 
     save_response = _save_project(client, str(project_save_path), project)
@@ -179,7 +430,11 @@ def test_save_load_roundtrip(client, tmp_path):
 
     loaded_project = load_response.json()["project"]
     assert loaded_project["charts"] == project["charts"]
-    assert loaded_project["regression"] == project["regression"]
+    assert loaded_project["regression"] is not None
+    assert loaded_project["regression"]["model_type"] == project["regression"]["model_type"]
+    assert loaded_project["regression"]["dependent"] == project["regression"]["dependent"]
+    assert loaded_project["regression"]["independents"] == project["regression"]["independents"]
+    assert loaded_project["regression"]["model_blob"] is None
     assert loaded_project["active_chart_id"] == "chart-1"
     assert loaded_project["dashboard_panels"] == project["dashboard_panels"]
 

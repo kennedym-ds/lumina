@@ -1,16 +1,34 @@
-"""Statistical inference services built on SciPy."""
+"""Statistical inference services built on SciPy and statsmodels."""
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy import stats
+from statsmodels.formula.api import ols as smf_ols
+from statsmodels.stats.anova import AnovaRM, anova_lm
+from statsmodels.stats.diagnostic import lilliefors
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from statsmodels.stats.power import FTestAnovaPower, TTestIndPower
 
-from app.models.inference import AnovaRequest, CIRequest, ChiSquareRequest, TTestRequest
+from app.models.inference import (
+    AnovaRequest,
+    CIRequest,
+    ChiSquareRequest,
+    KruskalRequest,
+    MannWhitneyRequest,
+    NormalityRequest,
+    PowerAnalysisRequest,
+    TTestRequest,
+    TukeyHSDRequest,
+    WilcoxonRequest,
+)
 
 _ALLOWED_ALTERNATIVES = {"two-sided", "less", "greater"}
+_SAFE_COL_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _as_float(value: Any) -> float:
@@ -33,6 +51,73 @@ def _coerce_numeric(series: pd.Series, column_name: str) -> pd.Series:
 def _validate_alternative(alternative: str) -> None:
     if alternative not in _ALLOWED_ALTERNATIVES:
         raise ValueError("alternative must be one of: two-sided, less, greater")
+
+
+def _prepare_grouped_numeric_dataframe(df: pd.DataFrame, numeric_column: str, group_column: str) -> pd.DataFrame:
+    _ensure_columns_exist(df, [numeric_column, group_column])
+
+    working = pd.DataFrame(
+        {
+            "value": _coerce_numeric(df[numeric_column], numeric_column),
+            "group": df[group_column],
+        }
+    ).dropna(subset=["value", "group"])
+
+    if working.empty:
+        raise ValueError("At least one non-null observation is required")
+
+    return working.assign(group_label=working["group"].map(str))
+
+
+def _build_grouped_series(
+    working: pd.DataFrame,
+    *,
+    minimum_groups: int,
+    minimum_group_size: int,
+    error_prefix: str,
+) -> dict[str, pd.Series]:
+    grouped_values: dict[str, pd.Series] = {}
+    for group_name, group_df in working.groupby("group_label", sort=True):
+        values = group_df["value"].astype(float)
+        if len(values) < minimum_group_size:
+            raise ValueError(f"{error_prefix} requires at least {minimum_group_size} observations per group")
+        grouped_values[str(group_name)] = values
+
+    if len(grouped_values) < minimum_groups:
+        raise ValueError(f"{error_prefix} requires at least {minimum_groups} groups")
+
+    return grouped_values
+
+
+def _resolve_two_group_samples(
+    working: pd.DataFrame,
+    *,
+    group_a: str | None,
+    group_b: str | None,
+    error_prefix: str,
+) -> tuple[str, pd.Series, str, pd.Series]:
+    available_groups = sorted({str(value) for value in working["group_label"]})
+
+    if group_a is not None or group_b is not None:
+        if not group_a or not group_b:
+            raise ValueError(f"{error_prefix} requires both group_a and group_b when specifying group labels")
+        if group_a == group_b:
+            raise ValueError("group_a and group_b must be different")
+
+        missing = [group for group in (group_a, group_b) if group not in available_groups]
+        if missing:
+            raise ValueError(f"Group label(s) not found: {', '.join(missing)}")
+
+        label_a = group_a
+        label_b = group_b
+    else:
+        if len(available_groups) != 2:
+            raise ValueError(f"{error_prefix} requires exactly 2 groups when group labels are not specified")
+        label_a, label_b = available_groups
+
+    sample_a = working.loc[working["group_label"] == label_a, "value"].astype(float)
+    sample_b = working.loc[working["group_label"] == label_b, "value"].astype(float)
+    return label_a, sample_a, label_b, sample_b
 
 
 def _welch_df(sample_a: pd.Series, sample_b: pd.Series) -> float:
@@ -360,4 +445,379 @@ def run_ci(df: pd.DataFrame, request: CIRequest) -> dict[str, Any]:
         "confidence_level": request.confidence_level,
         "n": int(len(sample)),
         "std_error": std_error,
+    }
+
+
+def run_tukey_hsd(df: pd.DataFrame, request: TukeyHSDRequest) -> dict[str, Any]:
+    """Run Tukey HSD pairwise comparisons for a numeric column by group."""
+
+    working = _prepare_grouped_numeric_dataframe(df, request.numeric_column, request.group_column)
+    grouped_values = _build_grouped_series(
+        working,
+        minimum_groups=2,
+        minimum_group_size=2,
+        error_prefix="Tukey HSD",
+    )
+
+    result = pairwise_tukeyhsd(
+        endog=working["value"].to_numpy(dtype=float),
+        groups=working["group_label"].to_numpy(dtype=str),
+        alpha=request.alpha,
+    )
+
+    comparisons = []
+    for row in result._results_table.data[1:]:
+        comparisons.append(
+            {
+                "group_a": str(row[0]),
+                "group_b": str(row[1]),
+                "mean_difference": _as_float(row[2]),
+                "adjusted_p_value": _as_float(row[3]),
+                "ci_lower": _as_float(row[4]),
+                "ci_upper": _as_float(row[5]),
+                "reject_null": bool(row[6]),
+            }
+        )
+
+    return {
+        "alpha": request.alpha,
+        "group_means": {group: _as_float(values.mean()) for group, values in grouped_values.items()},
+        "group_sizes": {group: int(len(values)) for group, values in grouped_values.items()},
+        "comparisons": comparisons,
+    }
+
+
+def run_mann_whitney(df: pd.DataFrame, request: MannWhitneyRequest) -> dict[str, Any]:
+    """Run a Mann-Whitney U test for two independent groups."""
+
+    _validate_alternative(request.alternative)
+    working = _prepare_grouped_numeric_dataframe(df, request.numeric_column, request.group_column)
+    label_a, sample_a, label_b, sample_b = _resolve_two_group_samples(
+        working,
+        group_a=request.group_a,
+        group_b=request.group_b,
+        error_prefix="Mann-Whitney U",
+    )
+
+    if len(sample_a) < 2 or len(sample_b) < 2:
+        raise ValueError("Mann-Whitney U requires at least 2 observations in each group")
+
+    result = stats.mannwhitneyu(sample_a, sample_b, alternative=request.alternative)
+    return {
+        "statistic": _as_float(result.statistic),
+        "p_value": _as_float(result.pvalue),
+        "group_a": label_a,
+        "group_b": label_b,
+        "median_a": _as_float(sample_a.median()),
+        "median_b": _as_float(sample_b.median()),
+        "n_a": int(len(sample_a)),
+        "n_b": int(len(sample_b)),
+        "alternative": request.alternative,
+    }
+
+
+def run_wilcoxon(df: pd.DataFrame, request: WilcoxonRequest) -> dict[str, Any]:
+    """Run a Wilcoxon signed-rank test for paired samples."""
+
+    _validate_alternative(request.alternative)
+    _ensure_columns_exist(df, [request.column_a, request.column_b])
+
+    working = pd.DataFrame(
+        {
+            "sample_a": _coerce_numeric(df[request.column_a], request.column_a),
+            "sample_b": _coerce_numeric(df[request.column_b], request.column_b),
+        }
+    ).dropna()
+
+    if len(working) < 2:
+        raise ValueError("Wilcoxon signed-rank requires at least 2 paired observations")
+
+    differences = (working["sample_a"] - working["sample_b"]).to_numpy(dtype=float)
+    if np.allclose(differences, 0.0):
+        raise ValueError("Wilcoxon signed-rank requires at least one non-zero paired difference")
+
+    result = stats.wilcoxon(
+        working["sample_a"],
+        working["sample_b"],
+        alternative=request.alternative,
+        zero_method="wilcox",
+    )
+    return {
+        "statistic": _as_float(result.statistic),
+        "p_value": _as_float(result.pvalue),
+        "n_pairs": int(len(working)),
+        "median_difference": _as_float(np.median(differences)),
+        "alternative": request.alternative,
+    }
+
+
+def run_kruskal(df: pd.DataFrame, request: KruskalRequest) -> dict[str, Any]:
+    """Run a Kruskal-Wallis test across two or more groups."""
+
+    working = _prepare_grouped_numeric_dataframe(df, request.numeric_column, request.group_column)
+    grouped_values = _build_grouped_series(
+        working,
+        minimum_groups=2,
+        minimum_group_size=2,
+        error_prefix="Kruskal-Wallis",
+    )
+
+    result = stats.kruskal(*grouped_values.values())
+    return {
+        "statistic": _as_float(result.statistic),
+        "p_value": _as_float(result.pvalue),
+        "df": len(grouped_values) - 1,
+        "group_medians": {group: _as_float(values.median()) for group, values in grouped_values.items()},
+        "group_sizes": {group: int(len(values)) for group, values in grouped_values.items()},
+    }
+
+
+def run_normality(df: pd.DataFrame, request: NormalityRequest) -> dict[str, Any]:
+    """Run combined Shapiro-Wilk, Anderson-Darling, and Lilliefors normality checks."""
+
+    _ensure_columns_exist(df, [request.column])
+    sample = _coerce_numeric(df[request.column], request.column).dropna()
+    if len(sample) < 3:
+        raise ValueError("Normality tests require at least 3 observations")
+
+    values = sample.to_numpy(dtype=float)
+    if len(values) <= 5000:
+        shapiro_result = stats.shapiro(values)
+        shapiro_payload = {
+            "statistic": _as_float(shapiro_result.statistic),
+            "p_value": _as_float(shapiro_result.pvalue),
+            "reject_null": _as_float(shapiro_result.pvalue) < request.alpha,
+            "ran": True,
+            "reason": None,
+        }
+    else:
+        shapiro_payload = {
+            "statistic": None,
+            "p_value": None,
+            "reject_null": None,
+            "ran": False,
+            "reason": "Shapiro-Wilk is only run for n <= 5000 observations.",
+        }
+
+    anderson_result = stats.anderson(values, dist="norm")
+    significance_levels = [float(level) for level in anderson_result.significance_level]
+    critical_values = [float(value) for value in anderson_result.critical_values]
+    critical_value_at_five = next(
+        (value for level, value in zip(significance_levels, critical_values, strict=False) if np.isclose(level, 5.0)),
+        None,
+    )
+    if critical_value_at_five is None:
+        raise ValueError("Anderson-Darling did not return a 5% critical value")
+
+    lilliefors_statistic, lilliefors_p_value = lilliefors(values, dist="norm")
+
+    return {
+        "column": request.column,
+        "n": int(len(sample)),
+        "alpha": request.alpha,
+        "shapiro": shapiro_payload,
+        "anderson_darling": {
+            "statistic": _as_float(anderson_result.statistic),
+            "critical_values": {
+                f"{level:.1f}%": _as_float(value)
+                for level, value in zip(significance_levels, critical_values, strict=False)
+            },
+            "reject_null": _as_float(anderson_result.statistic) > critical_value_at_five,
+            "significance_level": 0.05,
+        },
+        "lilliefors": {
+            "statistic": _as_float(lilliefors_statistic),
+            "p_value": _as_float(lilliefors_p_value),
+            "reject_null": _as_float(lilliefors_p_value) < request.alpha,
+            "ran": True,
+            "reason": None,
+        },
+    }
+
+
+def run_power_analysis(request: PowerAnalysisRequest) -> dict[str, Any]:
+    """Solve for sample size or achieved power for t-tests and one-way ANOVA."""
+
+    if request.analysis_type == "ttest":
+        analyzer = TTestIndPower()
+
+        if request.solve_for == "sample_size":
+            if request.power is None:
+                raise ValueError("power is required when solve_for='sample_size'")
+
+            sample_size_per_group = float(
+                analyzer.solve_power(
+                    effect_size=request.effect_size,
+                    alpha=request.alpha,
+                    power=request.power,
+                    ratio=request.ratio,
+                    alternative=request.alternative,
+                )
+            )
+            power = float(request.power)
+        else:
+            if request.sample_size_per_group is None:
+                raise ValueError("sample_size_per_group is required when solve_for='power'")
+
+            sample_size_per_group = float(request.sample_size_per_group)
+            power = float(
+                analyzer.power(
+                    effect_size=request.effect_size,
+                    nobs1=sample_size_per_group,
+                    alpha=request.alpha,
+                    ratio=request.ratio,
+                    alternative=request.alternative,
+                )
+            )
+
+        return {
+            "analysis_type": request.analysis_type,
+            "solve_for": request.solve_for,
+            "effect_size": request.effect_size,
+            "alpha": request.alpha,
+            "power": power,
+            "sample_size_per_group": sample_size_per_group,
+            "total_sample_size": float(sample_size_per_group * (1.0 + request.ratio)),
+            "ratio": request.ratio,
+            "k_groups": None,
+            "alternative": request.alternative,
+        }
+
+    analyzer = FTestAnovaPower()
+    if request.solve_for == "sample_size":
+        if request.power is None:
+            raise ValueError("power is required when solve_for='sample_size'")
+
+        total_sample_size = float(
+            analyzer.solve_power(
+                effect_size=request.effect_size,
+                alpha=request.alpha,
+                power=request.power,
+                k_groups=request.k_groups,
+            )
+        )
+        power = float(request.power)
+    else:
+        if request.sample_size_per_group is None:
+            raise ValueError("sample_size_per_group is required when solve_for='power'")
+
+        total_sample_size = float(request.sample_size_per_group * request.k_groups)
+        power = float(
+            analyzer.power(
+                effect_size=request.effect_size,
+                nobs=total_sample_size,
+                alpha=request.alpha,
+                k_groups=request.k_groups,
+            )
+        )
+
+    return {
+        "analysis_type": request.analysis_type,
+        "solve_for": request.solve_for,
+        "effect_size": request.effect_size,
+        "alpha": request.alpha,
+        "power": power,
+        "sample_size_per_group": float(total_sample_size / request.k_groups),
+        "total_sample_size": total_sample_size,
+        "ratio": None,
+        "k_groups": request.k_groups,
+        "alternative": None,
+    }
+
+
+def run_repeated_measures_anova(
+    df: pd.DataFrame,
+    subject_column: str,
+    within_column: str,
+    dependent_column: str,
+) -> dict:
+    """Run repeated-measures ANOVA via statsmodels AnovaRM."""
+    required = [subject_column, within_column, dependent_column]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}")
+
+    sub = df[required].dropna()
+    if sub.empty:
+        raise ValueError("No complete cases after dropping missing values.")
+
+    n_subjects = sub[subject_column].nunique()
+    if n_subjects < 2:
+        raise ValueError("RM-ANOVA requires at least 2 subjects.")
+    n_conditions = sub[within_column].nunique()
+    if n_conditions < 2:
+        raise ValueError("Within-subject factor must have at least 2 levels.")
+
+    aovrm = AnovaRM(sub, depvar=dependent_column, subject=subject_column, within=[within_column])
+    result = aovrm.fit()
+    table = result.anova_table
+
+    f_val = float(table["F Value"].iloc[0])
+    p_val = float(table["Pr > F"].iloc[0])
+    df_num = float(table["Num DF"].iloc[0])
+    df_den = float(table["Den DF"].iloc[0])
+
+    return {
+        "f_statistic": f_val,
+        "p_value": p_val,
+        "df_num": df_num,
+        "df_den": df_den,
+        "n_subjects": n_subjects,
+        "n_conditions": n_conditions,
+        "reject_null": p_val < 0.05,
+    }
+
+
+def run_factorial_anova(
+    df: pd.DataFrame,
+    dependent_column: str,
+    factors: list[str],
+) -> dict:
+    """Run factorial (Type II) ANOVA via statsmodels anova_lm."""
+    if len(factors) < 2:
+        raise ValueError("Factorial ANOVA requires at least 2 factors.")
+    if len(factors) > 4:
+        raise ValueError("Maximum 4 factors supported.")
+
+    all_cols = [dependent_column] + factors
+    missing = [c for c in all_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}")
+
+    sub = df[all_cols].dropna()
+    if sub.empty:
+        raise ValueError("No complete cases after dropping missing values.")
+
+    for col in all_cols:
+        if not _SAFE_COL_NAME.match(col):
+            raise ValueError(
+                f"Column name '{col}' contains characters incompatible with formula syntax. "
+                "Rename the column to use only letters, digits, and underscores."
+            )
+
+    # Build formula with all main effects and interactions
+    factor_terms = " * ".join(f"C({f})" for f in factors)
+    formula = f"{dependent_column} ~ {factor_terms}"
+
+    model = smf_ols(formula, data=sub).fit()
+    table = anova_lm(model, typ=2)
+
+    rows = []
+    for source, row in table.iterrows():
+        if source == "Residual":
+            continue
+        rows.append({
+            "source": str(source),
+            "sum_sq": float(row["sum_sq"]),
+            "df": float(row["df"]),
+            "f_statistic": float(row["F"]),
+            "p_value": float(row["PR(>F)"]),
+        })
+
+    reject_any = any(r["p_value"] < 0.05 for r in rows)
+
+    return {
+        "table": rows,
+        "n_observations": len(sub),
+        "reject_any": reject_any,
     }

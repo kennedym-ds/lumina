@@ -131,3 +131,42 @@ def generate_summary_report(
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def export_inference_results(results: list[dict]) -> tuple[str, bytes]:
+    """Export inference result history as Markdown report + CSV bytes.
+
+    Returns a tuple of (markdown_text, csv_bytes).
+    """
+    if not results:
+        return "# Inference Results\n\nNo results recorded.\n", b""
+
+    lines = ["# Inference Results\n"]
+
+    for i, r in enumerate(results, 1):
+        test_type = r.get("test_type", "unknown")
+        lines.append(f"## {i}. {test_type}\n")
+        for key, value in r.items():
+            if key == "test_type":
+                continue
+            lines.append(f"- **{key}**: {value}")
+        lines.append("")
+
+    markdown = "\n".join(lines)
+
+    # CSV from flat dicts
+    flat_rows = []
+    for r in results:
+        flat: dict = {}
+        for k, v in r.items():
+            if isinstance(v, (list, dict)):
+                flat[k] = str(v)
+            else:
+                flat[k] = v
+        flat_rows.append(flat)
+
+    buf = io.BytesIO()
+    pd.DataFrame(flat_rows).to_csv(buf, index=False)
+    csv_bytes = buf.getvalue()
+
+    return markdown, csv_bytes

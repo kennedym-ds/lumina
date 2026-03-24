@@ -59,6 +59,9 @@ describe("projectSerializer", () => {
       polynomialDegree: 4,
       maxDepth: 5,
       nEstimators: 150,
+      learningRate: 0.15,
+      interactionTerms: [["x1", "x2"]],
+      modelBlob: "persisted-model-blob",
     });
 
     useCrossFilterStore.getState().setSelection("chart-1", [2, 1]);
@@ -76,7 +79,7 @@ describe("projectSerializer", () => {
     const serialized = serializeProject();
 
     expect(serialized).not.toBeNull();
-    expect(serialized?.version).toBe("1.1");
+    expect(serialized?.version).toBe("1.2");
     expect(serialized?.file_path).toBe("C:\\data\\sample.csv");
     expect(serialized?.sheet_name).toBe("Sheet2");
     expect(serialized?.excluded_columns).toEqual(["category"]);
@@ -102,6 +105,9 @@ describe("projectSerializer", () => {
       polynomial_degree: 4,
       max_depth: 5,
       n_estimators: 150,
+      learning_rate: 0.15,
+      interaction_terms: [["x1", "x2"]],
+      model_blob: "persisted-model-blob",
     });
     expect(serialized?.cross_filter).toEqual({
       selected_indices: [1, 2],
@@ -136,5 +142,38 @@ describe("projectSerializer", () => {
     const serialized = serializeProject();
     expect(serialized?.cross_filter).toBeNull();
     expect(serialized?.dashboard_panels).toEqual([]);
+  });
+
+  it("remains backward compatible when no model blob is present", () => {
+    useDatasetStore.getState().hydrate({
+      datasetId: "ds_3",
+      fileName: "legacy.csv",
+      fileFormat: "csv",
+      columns: [],
+      rowCount: 10,
+      columnCount: 2,
+      filePath: "C:\\data\\legacy.csv",
+      sheetName: null,
+    });
+
+    useRegressionStore.getState().hydrateRegression({
+      modelType: "ols",
+      dependent: "y",
+      independents: ["x1"],
+      trainTestSplit: 1,
+      missingStrategy: "listwise",
+      alpha: 1,
+      l1Ratio: 0.5,
+      polynomialDegree: 1,
+      maxDepth: null,
+      nEstimators: 100,
+      learningRate: 0.1,
+      interactionTerms: [],
+    });
+
+    const serialized = serializeProject();
+
+    expect(serialized?.version).toBe("1.2");
+    expect(serialized?.regression).not.toHaveProperty("model_blob");
   });
 });

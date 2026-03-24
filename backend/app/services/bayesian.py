@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Iterable
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 _EPSILON = 1e-12
@@ -106,4 +107,97 @@ def bayesian_two_sample(
         "prob_greater_than_zero": prob_greater_than_zero,
         "group_a": posterior_a,
         "group_b": posterior_b,
+    }
+
+
+def bayesian_linear_regression(
+    df: pd.DataFrame,
+    dependent: str,
+    independents: list[str],
+    prior_mu: float = 0.0,
+    prior_kappa: float = 0.001,
+    prior_alpha: float = 1.0,
+    prior_beta: float = 1.0,
+    credible_level: float = 0.95,
+    missing_strategy: str = "listwise",
+) -> dict:
+    """Bayesian linear regression with conjugate normal-inverse-gamma prior.
+
+    Uses the analytic posterior for the normal linear model:
+      y | X, beta, sigma^2 ~ N(X @ beta, sigma^2 I)
+      beta | sigma^2 ~ N(mu_0, sigma^2 / kappa_0 * I)
+      sigma^2 ~ InvGamma(alpha_0, beta_0)
+    """
+    all_cols = [dependent] + independents
+    missing = [c for c in all_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}")
+
+    if missing_strategy == "mean_imputation":
+        sub = df[all_cols].copy()
+        for col in all_cols:
+            if sub[col].dtype.kind in "iuf":
+                sub[col] = sub[col].fillna(sub[col].mean())
+        sub = sub.dropna()
+    else:
+        sub = df[all_cols].dropna()
+
+    if len(sub) < len(independents) + 1:
+        raise ValueError("Not enough observations for the number of predictors.")
+
+    y = sub[dependent].values.astype(float)
+    X = np.column_stack([np.ones(len(y))] + [sub[c].values.astype(float) for c in independents])
+    n, p = X.shape
+
+    # Prior parameters
+    mu_0 = np.full(p, prior_mu)
+    Lambda_0 = prior_kappa * np.eye(p)
+    a_0 = prior_alpha
+    b_0 = prior_beta
+
+    # Posterior parameters (conjugate update)
+    Lambda_n = Lambda_0 + X.T @ X
+    try:
+        Lambda_n_inv = np.linalg.inv(Lambda_n)
+    except np.linalg.LinAlgError:
+        raise ValueError("Design matrix is singular or near-singular. Remove collinear predictors.")
+    mu_n = Lambda_n_inv @ (Lambda_0 @ mu_0 + X.T @ y)
+    a_n = a_0 + n / 2
+    b_n = b_0 + 0.5 * (y @ y + mu_0 @ Lambda_0 @ mu_0 - mu_n @ Lambda_n @ mu_n)
+
+    # Posterior mean and std of sigma^2
+    sigma2_mean = float(b_n / (a_n - 1)) if a_n > 1 else float(b_n / a_n)
+    sigma2_var = float(b_n**2 / ((a_n - 1) ** 2 * (a_n - 2))) if a_n > 2 else float("inf")
+    sigma2_std = float(np.sqrt(sigma2_var)) if np.isfinite(sigma2_var) else float("inf")
+
+    # Marginal posterior of beta is multivariate t
+    alpha_half = (1 - credible_level) / 2
+    t_crit = float(stats.t.ppf(1 - alpha_half, df=2 * a_n))
+
+    var_names = ["intercept"] + independents
+    coefficients = []
+    for i, name in enumerate(var_names):
+        post_mean = float(mu_n[i])
+        scale = float(np.sqrt((b_n / a_n) * Lambda_n_inv[i, i]))
+        coefficients.append({
+            "variable": name,
+            "posterior_mean": post_mean,
+            "posterior_std": scale,
+            "ci_lower": post_mean - t_crit * scale,
+            "ci_upper": post_mean + t_crit * scale,
+        })
+
+    # R-squared from posterior mean predictions
+    y_pred = X @ mu_n
+    ss_res = float(np.sum((y - y_pred) ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+    return {
+        "coefficients": coefficients,
+        "sigma_squared_mean": sigma2_mean,
+        "sigma_squared_std": sigma2_std,
+        "r_squared": r_squared,
+        "n_observations": n,
+        "credible_level": credible_level,
     }

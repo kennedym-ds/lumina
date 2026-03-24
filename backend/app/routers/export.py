@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from app.services.export_service import export_dataframe_csv, export_dataframe_excel, generate_summary_report
+from app.services.export_service import export_dataframe_csv, export_dataframe_excel, export_inference_results, generate_summary_report
 from app.services.profiling import profile_dataset
 from app.session import DatasetSession, store
 
@@ -83,4 +84,24 @@ async def export_report(dataset_id: str):
         content=report_md.encode("utf-8"),
         media_type="text/markdown",
         headers={"Content-Disposition": 'attachment; filename="lumina-report.md"'},
+    )
+
+
+@router.get("/{dataset_id}/inference-report")
+def download_inference_report(dataset_id: str, fmt: Literal["markdown", "csv"] = "markdown"):
+    """Download stored inference results as Markdown or CSV."""
+    session = _get_session(dataset_id)
+    results = list(session.inference_results)
+    markdown, csv_bytes = export_inference_results(results)
+
+    if fmt == "csv":
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{_base_file_name(session)}_inference.csv"'},
+        )
+    return Response(
+        content=markdown.encode("utf-8"),
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{_base_file_name(session)}_inference.md"'},
     )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -18,7 +20,7 @@ class ChartState(BaseModel):
 
 
 class RegressionState(BaseModel):
-    """Serialized regression configuration (not fitted model artifacts)."""
+    """Serialized regression configuration and optional fitted model artifacts."""
 
     model_type: str  # "ols" | "logistic" | "ridge" | "lasso" | "elastic_net" | "decision_tree" | "random_forest"
     dependent: str | None = None
@@ -30,6 +32,10 @@ class RegressionState(BaseModel):
     polynomial_degree: int = Field(default=1, ge=1, le=5)
     max_depth: int | None = Field(default=None, ge=1)
     n_estimators: int = Field(default=100, ge=1)
+    learning_rate: float = Field(default=0.1, gt=0)
+    model_blob: str | None = None
+    model_result: dict[str, Any] | None = None
+    model_history: list[dict[str, Any]] | None = None
 
 
 class CrossFilterState(BaseModel):
@@ -53,7 +59,7 @@ class DashboardPanelState(BaseModel):
 class ProjectSchema(BaseModel):
     """The .lumina project file schema."""
 
-    version: str = "1.1"
+    version: str = "1.2"
 
     file_path: str
     file_name: str
