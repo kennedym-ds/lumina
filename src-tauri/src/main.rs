@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Mutex;
 use tauri::Manager;
 
 fn main() {
@@ -22,7 +23,9 @@ fn main() {
             });
 
             // Inject port and token into the webview via JavaScript
-            let window = app.get_webview_window("main").expect("main window not found");
+            let window = app
+                .get_webview_window("main")
+                .expect("main window not found");
             let js = format!(
                 "window.__LUMINA_API_PORT__ = {}; window.__LUMINA_API_TOKEN__ = \"{}\";",
                 port, token
@@ -34,18 +37,17 @@ fn main() {
             {
                 use tauri_plugin_shell::ShellExt;
                 let shell = app.shell();
-                let _child = shell
+                let sidecar_child = shell
                     .sidecar("lumina-backend")
                     .expect("failed to create sidecar command")
-                    .args([
-                        "--port",
-                        &port.to_string(),
-                        "--token",
-                        &token,
-                    ])
+                    .args(["--port", &port.to_string(), "--token", &token])
                     .spawn()
                     .expect("failed to spawn sidecar");
 
+                // Keep the child handle alive in app state.
+                // CommandChild::drop() sends SIGKILL, so storing it here ensures
+                // the sidecar is killed when the app exits rather than immediately.
+                app.manage(Mutex::new(Some(sidecar_child)));
                 println!("[lumina] Sidecar spawned");
             }
 

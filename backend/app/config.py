@@ -9,7 +9,7 @@ import secrets
 class Settings:
     port: int = 8089
     token: str = ""
-    debug: bool = True
+    debug: bool = False
     plugin_dir: str = "plugins"
     model_signing_key_path: Path = field(default_factory=lambda: Path(__file__).resolve().parent / ".model-signing-key")
 

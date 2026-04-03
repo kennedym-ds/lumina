@@ -1,5 +1,7 @@
 """Bearer token authentication middleware."""
 
+import hmac
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -26,7 +28,7 @@ class BearerTokenMiddleware(BaseHTTPMiddleware):
             )
 
         provided_token = auth_header[7:]  # Strip "Bearer " prefix
-        if provided_token != self.token:
+        if not hmac.compare_digest(provided_token, self.token):
             return JSONResponse(
                 status_code=401,
                 content={"error": "UNAUTHORIZED", "detail": "Invalid bearer token"},

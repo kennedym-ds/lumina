@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
     # Health endpoint (no auth required — handled before middleware)
     @app.get("/api/health")
     async def health():
-        return {"status": "ok", "version": "1.0.0"}
+        return {"status": "ok", "version": "2.1.0"}
 
     app.include_router(data_router)
     app.include_router(eda_router)
