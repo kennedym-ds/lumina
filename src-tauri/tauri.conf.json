@@ -28,6 +28,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "binaries/lumina-backend"
+    ],
     "fileAssociations": [
       {
         "ext": [

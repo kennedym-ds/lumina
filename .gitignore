@@ -20,6 +20,12 @@ backend/app/.model-signing-key
 
 # PyInstaller
 *.spec.bak
+backend/.venv-build/
+
+# Tauri generated/build artifacts
+src-tauri/gen/
+src-tauri/binaries/
+src-tauri/Cargo.lock
 
 # Generated icon source (regenerate with scripts/gen-icons.py)
 src-tauri/icon-source.png

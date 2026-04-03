@@ -37,18 +37,21 @@ fn main() {
             {
                 use tauri_plugin_shell::ShellExt;
                 let shell = app.shell();
-                let sidecar_child = shell
-                    .sidecar("lumina-backend")
-                    .expect("failed to create sidecar command")
-                    .args(["--port", &port.to_string(), "--token", &token])
-                    .spawn()
-                    .expect("failed to spawn sidecar");
-
-                // Keep the child handle alive in app state.
-                // CommandChild::drop() sends SIGKILL, so storing it here ensures
-                // the sidecar is killed when the app exits rather than immediately.
-                app.manage(Mutex::new(Some(sidecar_child)));
-                println!("[lumina] Sidecar spawned");
+                match shell.sidecar("lumina-backend").and_then(|cmd| {
+                    cmd.args(["--port", &port.to_string(), "--token", &token])
+                        .spawn()
+                }) {
+                    Ok(sidecar_child) => {
+                        // Keep the child handle alive in app state so the sidecar
+                        // is only killed when the app exits, not when setup() returns.
+                        app.manage(Mutex::new(Some(sidecar_child)));
+                        println!("[lumina] Sidecar spawned on port {port}");
+                    }
+                    Err(e) => {
+                        eprintln!("[lumina] Failed to spawn sidecar: {e}");
+                        return Err(e.into());
+                    }
+                }
             }
 
             // In development, the backend is started separately
