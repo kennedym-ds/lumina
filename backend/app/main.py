@@ -1,7 +1,6 @@
 """Lumina backend — FastAPI application entry point."""
 
 import argparse
-import sys
 from pathlib import Path
 
 import uvicorn

@@ -7,7 +7,6 @@ supporting multiple datasets for future multi-tab work.
 
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
