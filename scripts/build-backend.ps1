@@ -23,13 +23,11 @@ $requirementsPath = Join-Path $backendRoot "requirements.txt"
 
 $pyInstallerBuildPath = Join-Path $backendRoot "build"
 $pyInstallerDistPath = Join-Path $backendRoot "dist"
-$pyInstallerOutputDir = Join-Path $pyInstallerDistPath "lumina-backend"
 
 $tauriBinariesPath = Join-Path $repoRoot "src-tauri\binaries"
-$targetDir = Join-Path $tauriBinariesPath "lumina-backend-x86_64-pc-windows-msvc"
 $targetExeName = "lumina-backend-x86_64-pc-windows-msvc.exe"
-$defaultExePath = Join-Path $targetDir "lumina-backend.exe"
-$finalExePath = Join-Path $targetDir $targetExeName
+$distExePath = Join-Path $pyInstallerDistPath "lumina-backend.exe"
+$finalExePath = Join-Path $tauriBinariesPath $targetExeName
 
 function Write-Info {
     param([string]$Message)
@@ -57,7 +55,7 @@ if ($Clean) {
     Write-Info "-Clean enabled: removing previous PyInstaller artifacts and staged binaries"
     Remove-PathIfExists -Path $pyInstallerBuildPath
     Remove-PathIfExists -Path $pyInstallerDistPath
-    Remove-PathIfExists -Path $targetDir
+    Remove-PathIfExists -Path $finalExePath
 }
 
 Write-Info "Recreating clean build virtual environment at $buildVenvPath"
@@ -89,34 +87,17 @@ finally {
     Pop-Location
 }
 
-if (-not (Test-Path -LiteralPath $pyInstallerOutputDir)) {
-    throw "Expected PyInstaller output directory not found: $pyInstallerOutputDir"
+if (-not (Test-Path -LiteralPath $distExePath)) {
+    throw "Expected PyInstaller output not found: $distExePath"
 }
 
-Write-Info "Staging sidecar output to Tauri binaries directory"
+Write-Info "Staging sidecar to Tauri binaries directory"
 if (-not (Test-Path -LiteralPath $tauriBinariesPath)) {
     New-Item -ItemType Directory -Path $tauriBinariesPath | Out-Null
 }
 
-Remove-PathIfExists -Path $targetDir
-Copy-Item -Path $pyInstallerOutputDir -Destination $targetDir -Recurse
+Remove-PathIfExists -Path $finalExePath
+Copy-Item -Path $distExePath -Destination $finalExePath
 
-if (-not (Test-Path -LiteralPath $defaultExePath)) {
-    throw "Expected backend executable not found after staging: $defaultExePath"
-}
-
-if (Test-Path -LiteralPath $finalExePath) {
-    Remove-Item -LiteralPath $finalExePath -Force
-}
-
-Rename-Item -LiteralPath $defaultExePath -NewName $targetExeName
-Write-Ok "Renamed sidecar executable to $targetExeName"
-
-$sizeBytes = (Get-ChildItem -Path $targetDir -Recurse -File | Measure-Object -Property Length -Sum).Sum
-if ($null -eq $sizeBytes) {
-    $sizeBytes = 0
-}
-
-$sizeMiB = [math]::Round($sizeBytes / 1MB, 2)
-Write-Ok "Sidecar output staged at: $targetDir"
-Write-Ok "Total output size: $sizeBytes bytes ($sizeMiB MiB)"
+$sizeMiB = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
+Write-Ok "Sidecar staged at: $finalExePath ($sizeMiB MiB)"

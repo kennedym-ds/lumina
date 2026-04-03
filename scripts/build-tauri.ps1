@@ -16,8 +16,7 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $buildBackendScript = Join-Path $PSScriptRoot "build-backend.ps1"
-$sidecarDir = Join-Path $repoRoot "src-tauri\binaries\lumina-backend-x86_64-pc-windows-msvc"
-$sidecarExe = Join-Path $sidecarDir "lumina-backend-x86_64-pc-windows-msvc.exe"
+$sidecarExe = Join-Path $repoRoot "src-tauri\binaries\lumina-backend-x86_64-pc-windows-msvc.exe"
 $bundleRoot = Join-Path $repoRoot "src-tauri\target\release\bundle"
 
 function Write-Info {

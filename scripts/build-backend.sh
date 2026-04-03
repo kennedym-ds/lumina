@@ -16,8 +16,7 @@ case "$(uname -s)-$(uname -m)" in
 esac
 
 TAURI_BIN_DIR="$REPO_ROOT/src-tauri/binaries"
-TARGET_DIR="$TAURI_BIN_DIR/lumina-backend-$TARGET"
-TARGET_EXE="$TARGET_DIR/lumina-backend-$TARGET"
+TARGET_EXE="$TAURI_BIN_DIR/lumina-backend-$TARGET"
 
 echo "[INFO] Building for target: $TARGET"
 
@@ -32,13 +31,10 @@ pip install "pyinstaller>=6,<7"
 cd "$BACKEND_ROOT"
 python -m PyInstaller --noconfirm --clean "$SPEC_PATH"
 
-DIST_DIR="$BACKEND_ROOT/dist/lumina-backend"
+DIST_EXE="$BACKEND_ROOT/dist/lumina-backend"
 mkdir -p "$TAURI_BIN_DIR"
-rm -rf "$TARGET_DIR"
-cp -r "$DIST_DIR" "$TARGET_DIR"
-
-mv "$TARGET_DIR/lumina-backend" "$TARGET_EXE"
+cp "$DIST_EXE" "$TARGET_EXE"
 chmod +x "$TARGET_EXE"
 
-echo "[OK] Sidecar staged at: $TARGET_DIR"
-du -sh "$TARGET_DIR"
+echo "[OK] Sidecar staged at: $TARGET_EXE"
+du -sh "$TARGET_EXE"

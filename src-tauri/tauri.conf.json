@@ -28,9 +28,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": [
-      "binaries/lumina-backend-*/**"
-    ],
     "fileAssociations": [
       {
         "ext": [
