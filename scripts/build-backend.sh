@@ -33,6 +33,7 @@ cd "$BACKEND_ROOT"
 python -m PyInstaller --noconfirm --clean "$SPEC_PATH"
 
 DIST_DIR="$BACKEND_ROOT/dist/lumina-backend"
+mkdir -p "$TAURI_BIN_DIR"
 rm -rf "$TARGET_DIR"
 cp -r "$DIST_DIR" "$TARGET_DIR"
 
