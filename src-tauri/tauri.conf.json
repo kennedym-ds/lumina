@@ -52,16 +52,4 @@
       "minimumSystemVersion": "10.15"
     }
   },
-  "plugins": {
-    "shell": {
-      "scope": [
-        {
-          "name": "lumina-backend",
-          "cmd": "binaries/lumina-backend",
-          "sidecar": true,
-          "args": true
-        }
-      ]
-    }
-  }
 }
