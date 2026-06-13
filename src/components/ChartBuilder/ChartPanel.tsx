@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef } from "react";
 import { useChartData } from "@/api/eda";
 import { PlotlyChart } from "@/components/Chart/PlotlyChart";
 import { ChartTypeSelector } from "@/components/ChartBuilder/ChartTypeSelector";
-import { VariableShelf } from "@/components/ChartBuilder/VariableShelf";
+import { VariableShelf, type ShelfType } from "@/components/ChartBuilder/VariableShelf";
 import { useChartStore } from "@/stores/chartStore";
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
 import { useDatasetStore } from "@/stores/datasetStore";
@@ -14,8 +14,6 @@ interface ChartPanelProps {
 }
 
 const DEBOUNCE_MS = 150;
-
-type ShelfType = "x" | "y" | "color" | "facet";
 
 const visibleShelvesByChartType: Record<ChartType, ShelfType[]> = {
   histogram: ["x", "color", "facet"],
@@ -29,6 +27,11 @@ const visibleShelvesByChartType: Record<ChartType, ShelfType[]> = {
   pie: ["x"],
   area: ["x", "y", "color", "facet"],
   qq_plot: ["x"],
+  bubble: ["x", "y", "size", "color", "facet"],
+  strip: ["x", "y", "color", "facet"],
+  error_bar: ["x", "y", "color", "facet"],
+  treemap: ["x", "y"],
+  parallel_coords: ["color"],
 };
 
 function getVisibleShelves(chartType: ChartType): Set<ShelfType> {
@@ -126,6 +129,15 @@ export function ChartPanel({ chartId, datasetId }: ChartPanelProps) {
             value={chart.facet}
             onDrop={(columnName) => updateChart(chart.chartId, { facet: columnName })}
             onRemove={() => updateChart(chart.chartId, { facet: null })}
+          />
+        ) : null}
+        {visibleShelves.has("size") ? (
+          <VariableShelf
+            chartId={chart.chartId}
+            shelfType="size"
+            value={chart.size ?? null}
+            onDrop={(columnName) => updateChart(chart.chartId, { size: columnName })}
+            onRemove={() => updateChart(chart.chartId, { size: null })}
           />
         ) : null}
 

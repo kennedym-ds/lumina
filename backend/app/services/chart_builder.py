@@ -38,6 +38,11 @@ SUPPORTED_CHART_TYPES = {
     "pie",
     "area",
     "qq_plot",
+    "bubble",
+    "strip",
+    "error_bar",
+    "treemap",
+    "parallel_coords",
 }
 WEBGL_THRESHOLD = 10_000
 DOWNSAMPLE_THRESHOLD = 10_000
@@ -113,6 +118,11 @@ def _validate_chart_request(df: pd.DataFrame, request: ChartRequest) -> None:
         "pie": {"x"},
         "area": {"x", "y"},
         "qq_plot": {"x"},
+        "bubble": {"x", "y"},
+        "strip": {"y"},
+        "error_bar": {"x", "y"},
+        "treemap": {"x"},
+        "parallel_coords": set(),
     }
 
     required_fields = required_by_type.get(request.chart_type, set())
@@ -121,7 +131,7 @@ def _validate_chart_request(df: pd.DataFrame, request: ChartRequest) -> None:
         if not value:
             raise ValueError(f"'{field_name}' is required for chart_type '{request.chart_type}'")
 
-    provided_columns = [request.x, request.y, request.color, request.facet, request.values]
+    provided_columns = [request.x, request.y, request.color, request.facet, request.values, request.size]
     for column in provided_columns:
         if column and column not in df.columns:
             raise ValueError(f"Column '{column}' not found")
@@ -546,6 +556,226 @@ def _build_qq_plot(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[s
     return traces, len(filtered), False, layout
 
 
+def _build_bubble(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    cols = [request.x, request.y]
+    if request.color:
+        cols.append(request.color)
+    if request.size:
+        cols.append(request.size)
+    filtered = df[cols].dropna()
+    use_webgl = len(filtered) > WEBGL_THRESHOLD
+    trace_type = "scattergl" if use_webgl else "scatter"
+
+    # Pre-compute size scaling bounds across the full filtered set
+    size_min = size_max = None
+    if request.size:
+        raw_size = _coerce_numeric_series(filtered[request.size], request.size)
+        size_min, size_max = float(raw_size.min()), float(raw_size.max())
+
+    def _scale_sizes(group: pd.DataFrame) -> list[float] | int:
+        if not request.size or size_min is None or size_max is None:
+            return 12
+        s = _coerce_numeric_series(group[request.size], request.size)
+        span = size_max - size_min
+        if span > 0:
+            return _to_json_list((5.0 + 45.0 * (s - size_min) / span).tolist())
+        return [20.0] * len(s)
+
+    traces: list[dict[str, Any]] = []
+    if request.color:
+        for color_value, group in filtered.groupby(request.color, dropna=True):
+            traces.append({
+                "type": trace_type,
+                "mode": "markers",
+                "name": str(color_value),
+                "x": _to_json_list(group[request.x].tolist()),
+                "y": _to_json_list(group[request.y].tolist()),
+                "customdata": _to_json_list(group.index.tolist()),
+                "marker": {"size": _scale_sizes(group), "sizemode": "diameter"},
+            })
+    else:
+        traces.append({
+            "type": trace_type,
+            "mode": "markers",
+            "x": _to_json_list(filtered[request.x].tolist()),
+            "y": _to_json_list(filtered[request.y].tolist()),
+            "customdata": _to_json_list(filtered.index.tolist()),
+            "marker": {"size": _scale_sizes(filtered), "sizemode": "diameter"},
+        })
+
+    title = f"Bubble: {request.y} vs {request.x}"
+    if request.size:
+        title += f" (size: {request.size})"
+    layout = _make_layout(title=title, x_title=request.x, y_title=request.y)
+    return traces, len(filtered), use_webgl, layout
+
+
+def _build_strip(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    cols = [request.y]
+    if request.x:
+        cols.append(request.x)
+    if request.color:
+        cols.append(request.color)
+    filtered = df[cols].dropna()
+
+    group_col = request.x or request.color
+    traces: list[dict[str, Any]] = []
+
+    base_marker: dict[str, Any] = {"opacity": 0.7}
+    base_box: dict[str, Any] = {
+        "type": "box",
+        "boxpoints": "all",
+        "jitter": 0.4,
+        "whiskerwidth": 0,
+        "fillcolor": "rgba(0,0,0,0)",
+        "line": {"width": 0},
+        "marker": base_marker,
+    }
+
+    if group_col:
+        for group_value, group in filtered.groupby(group_col, dropna=True):
+            trace = {
+                **base_box,
+                "name": str(group_value),
+                "y": _to_json_list(group[request.y].tolist()),
+                "x": [str(group_value)] * len(group),
+            }
+            traces.append(trace)
+    else:
+        traces.append({**base_box, "y": _to_json_list(filtered[request.y].tolist())})
+
+    layout = _make_layout(
+        title=f"Strip: {request.y}" + (f" by {group_col}" if group_col else ""),
+        x_title=group_col or "",
+        y_title=request.y,
+    )
+    return traces, len(filtered), False, layout
+
+
+def _build_error_bar(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    cols = [request.x, request.y] + ([request.color] if request.color else [])
+    filtered = df[cols].dropna()
+
+    traces: list[dict[str, Any]] = []
+    if request.color:
+        for color_value, group in filtered.groupby(request.color, dropna=True):
+            agg = group.groupby(request.x, dropna=True)[request.y].agg(["mean", "std"]).reset_index()
+            agg["std"] = agg["std"].fillna(0.0)
+            traces.append({
+                "type": "bar",
+                "name": str(color_value),
+                "x": _to_json_list(agg[request.x].tolist()),
+                "y": _to_json_list(agg["mean"].tolist()),
+                "error_y": {"type": "data", "array": _to_json_list(agg["std"].tolist()), "visible": True},
+            })
+    else:
+        agg = filtered.groupby(request.x, dropna=True)[request.y].agg(["mean", "std"]).reset_index()
+        agg["std"] = agg["std"].fillna(0.0)
+        traces.append({
+            "type": "bar",
+            "x": _to_json_list(agg[request.x].tolist()),
+            "y": _to_json_list(agg["mean"].tolist()),
+            "error_y": {"type": "data", "array": _to_json_list(agg["std"].tolist()), "visible": True},
+        })
+
+    layout = _make_layout(
+        title=f"Error Bar: Mean {request.y} by {request.x}",
+        x_title=request.x,
+        y_title=f"Mean of {request.y} (±SD)",
+        barmode="group" if request.color else None,
+    )
+    return traces, len(filtered), False, layout
+
+
+def _build_treemap(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    cols = [request.x]
+    if request.y:
+        cols.append(request.y)
+    if request.values:
+        cols.append(request.values)
+    filtered = df[cols].dropna()
+
+    if request.y:
+        # Two-level hierarchy: y = parent category, x = leaf
+        group_keys = [request.y, request.x]
+        if request.values:
+            agg = filtered.groupby(group_keys, dropna=True)[request.values].sum().reset_index()
+            leaf_sizes: list[Any] = _to_json_list(agg[request.values].tolist())
+        else:
+            agg = filtered.groupby(group_keys, dropna=True).size().reset_index(name="_n")
+            leaf_sizes = _to_json_list(agg["_n"].tolist())
+
+        parents_raw = [str(v) for v in agg[request.y].tolist()]
+        leaves_raw = [str(v) for v in agg[request.x].tolist()]
+        parent_unique = sorted(set(parents_raw))
+
+        # Use prefixed IDs to avoid label collisions between levels
+        parent_ids = [f"__p:{p}" for p in parent_unique]
+        leaf_ids = [f"__l:{p}:{c}" for p, c in zip(parents_raw, leaves_raw)]
+        all_ids = parent_ids + leaf_ids
+        all_labels = parent_unique + leaves_raw
+        all_parents = [""] * len(parent_unique) + [f"__p:{p}" for p in parents_raw]
+        all_values: list[Any] = [0] * len(parent_unique) + leaf_sizes
+    else:
+        if request.values:
+            agg_df = filtered.groupby(request.x, dropna=True)[request.values].sum().reset_index()
+            all_labels = [str(v) for v in agg_df[request.x].tolist()]
+            all_values = _to_json_list(agg_df[request.values].tolist())
+        else:
+            counts = filtered[request.x].value_counts().reset_index()
+            counts.columns = pd.Index([request.x, "_n"])
+            all_labels = [str(v) for v in counts[request.x].tolist()]
+            all_values = _to_json_list(counts["_n"].tolist())
+        all_ids = all_labels
+        all_parents = [""] * len(all_labels)
+
+    trace: dict[str, Any] = {
+        "type": "treemap",
+        "ids": all_ids,
+        "labels": all_labels,
+        "parents": all_parents,
+        "values": all_values,
+        "textinfo": "label+value+percent parent",
+    }
+    title = f"Treemap: {request.x}" + (f" by {request.y}" if request.y else "")
+    return [trace], len(filtered), False, _make_pie_layout(title)
+
+
+def _build_parallel_coords(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    numeric_cols = [col for col in df.select_dtypes(include="number").columns if col != request.color]
+    if len(numeric_cols) < 2:
+        raise ValueError("Parallel coordinates requires at least 2 numeric columns in the dataset")
+
+    cols = list(numeric_cols) + ([request.color] if request.color else [])
+    filtered = df[cols].dropna()
+
+    dimensions = [
+        {"label": col, "values": _to_json_list(filtered[col].tolist())}
+        for col in numeric_cols
+    ]
+
+    trace: dict[str, Any] = {"type": "parcoords", "dimensions": dimensions}
+
+    if request.color:
+        categories = filtered[request.color].astype("category")
+        trace["line"] = {
+            "color": _to_json_list(categories.cat.codes.tolist()),
+            "colorscale": "Viridis",
+            "showscale": True,
+            "colorbar": {
+                "tickvals": list(range(len(categories.cat.categories))),
+                "ticktext": [str(c) for c in categories.cat.categories],
+                "title": {"text": request.color},
+            },
+        }
+
+    title = "Parallel Coordinates"
+    if request.color:
+        title += f" (colored by {request.color})"
+    layout: dict[str, Any] = {"title": {"text": title}, "template": "plotly_white"}
+    return [trace], len(filtered), False, layout
+
+
 def _apply_faceting(
     df: pd.DataFrame,
     request: ChartRequest,
@@ -723,6 +953,11 @@ def build_chart_figure(
         "pie": _build_pie,
         "area": _build_area,
         "qq_plot": _build_qq_plot,
+        "bubble": _build_bubble,
+        "strip": _build_strip,
+        "error_bar": _build_error_bar,
+        "treemap": _build_treemap,
+        "parallel_coords": _build_parallel_coords,
     }
     builders.update(get_chart_plugins())
     builder_fn = builders.get(request.chart_type)

@@ -1,6 +1,6 @@
 import { useDndMonitor, useDroppable } from "@dnd-kit/core";
 
-type ShelfType = "x" | "y" | "color" | "facet";
+export type ShelfType = "x" | "y" | "color" | "facet" | "size";
 
 interface VariableShelfProps {
   shelfType: ShelfType;
@@ -15,6 +15,7 @@ const shelfLabelByType: Record<ShelfType, string> = {
   y: "Y Axis",
   color: "Color",
   facet: "Facet",
+  size: "Size",
 };
 
 export function getShelfDropId(shelfType: ShelfType, chartId?: string): string {

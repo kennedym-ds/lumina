@@ -30,6 +30,16 @@ export function hasRequiredFields(config: ChartConfig): boolean {
       return Boolean(config.x && config.y);
     case "qq_plot":
       return Boolean(config.x);
+    case "bubble":
+      return Boolean(config.x && config.y);
+    case "strip":
+      return Boolean(config.y);
+    case "error_bar":
+      return Boolean(config.x && config.y);
+    case "treemap":
+      return Boolean(config.x);
+    case "parallel_coords":
+      return true;
     default:
       return false;
   }
@@ -57,6 +67,10 @@ export function createChartRequest(config: ChartConfig): ChartRequest {
     request.values = config.values;
   }
 
+  if (config.chartType === "bubble" && config.size) {
+    request.size = config.size;
+  }
+
   return request;
 }
 
@@ -74,6 +88,7 @@ function getConfigKey(config: ChartConfig | null): string {
     aggregation: config.aggregation,
     values: config.values,
     nbins: config.nbins,
+    size: config.size,
   });
 }
 

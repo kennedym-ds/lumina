@@ -11,7 +11,12 @@ export type ChartType =
   | "density"
   | "pie"
   | "area"
-  | "qq_plot";
+  | "qq_plot"
+  | "bubble"
+  | "strip"
+  | "error_bar"
+  | "treemap"
+  | "parallel_coords";
 export type LuminaDtype = "numeric" | "categorical" | "datetime" | "text" | "boolean";
 
 export interface ChartConfig {
@@ -24,6 +29,7 @@ export interface ChartConfig {
   aggregation?: string | null;
   values?: string | null;
   nbins?: number;
+  size?: string | null;
 }
 
 export interface ChartRequest {
@@ -35,6 +41,7 @@ export interface ChartRequest {
   aggregation?: string | null;
   values?: string | null;
   nbins?: number;
+  size?: string | null;
 }
 
 export interface ChartResponse {

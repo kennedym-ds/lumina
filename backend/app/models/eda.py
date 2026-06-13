@@ -14,6 +14,7 @@ class ChartRequest(BaseModel):
     nbins: int | None = None
     aggregation: str | None = None
     values: str | None = None
+    size: str | None = None  # bubble: numeric column mapped to marker diameter
 
 
 class ChartResponse(BaseModel):

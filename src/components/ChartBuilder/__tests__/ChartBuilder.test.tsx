@@ -23,16 +23,21 @@ describe("ChartBuilder", () => {
     useChartStore.getState().clearCharts();
   });
 
-  it("renders chart type selector with 11 options", () => {
+  it("renders chart type selector with 16 options", () => {
     render(<ChartTypeSelector value="histogram" onChange={() => undefined} />);
 
-    expect(screen.getAllByRole("button")).toHaveLength(11);
+    expect(screen.getAllByRole("button")).toHaveLength(16);
     expect(screen.getByRole("button", { name: /violin/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /heatmap/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /density/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^pie$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /area/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /q-q plot/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /bubble/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /strip/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /error bar/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /treemap/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /parallel/i })).toBeTruthy();
   });
 
   it("switching chart type updates active button", async () => {
