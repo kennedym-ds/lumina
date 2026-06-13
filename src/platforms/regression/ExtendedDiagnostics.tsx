@@ -2,7 +2,9 @@ import createPlotlyComponent from "react-plotly.js/factory";
 import Plotly from "plotly.js-dist-min";
 import type * as PlotlyTypes from "plotly.js";
 import { useExtendedDiagnostics } from "@/api/model";
-import { OKABE_ITO_COLORWAY } from "@/constants/palette";
+import { PALETTES } from "@/constants/palettes";
+
+const OKABE_ITO_COLORWAY = PALETTES["okabe-ito"].colors;
 
 const Plot = createPlotlyComponent(Plotly);
 

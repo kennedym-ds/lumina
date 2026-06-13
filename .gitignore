@@ -31,7 +31,7 @@ src-tauri/Cargo.lock
 src-tauri/icon-source.png
 
 # IDE
-.vscode/settings.json
+.vscode/
 .idea/
 
 # Environment
