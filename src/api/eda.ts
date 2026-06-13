@@ -71,6 +71,14 @@ export function createChartRequest(config: ChartConfig): ChartRequest {
     request.size = config.size;
   }
 
+  if ((config.chartType === "scatter" || config.chartType === "bubble") && config.trendline) {
+    request.trendline = config.trendline;
+  }
+
+  if (config.chartType === "histogram" && config.show_kde) {
+    request.show_kde = config.show_kde;
+  }
+
   return request;
 }
 
@@ -89,6 +97,8 @@ function getConfigKey(config: ChartConfig | null): string {
     values: config.values,
     nbins: config.nbins,
     size: config.size,
+    trendline: config.trendline,
+    show_kde: config.show_kde,
   });
 }
 

@@ -30,6 +30,8 @@ export interface ChartConfig {
   values?: string | null;
   nbins?: number;
   size?: string | null;
+  trendline?: string | null;
+  show_kde?: boolean;
 }
 
 export interface ChartRequest {
@@ -42,6 +44,8 @@ export interface ChartRequest {
   values?: string | null;
   nbins?: number;
   size?: string | null;
+  trendline?: string | null;
+  show_kde?: boolean;
 }
 
 export interface ChartResponse {

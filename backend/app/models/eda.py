@@ -14,7 +14,9 @@ class ChartRequest(BaseModel):
     nbins: int | None = None
     aggregation: str | None = None
     values: str | None = None
-    size: str | None = None  # bubble: numeric column mapped to marker diameter
+    size: str | None = None      # bubble: numeric column mapped to marker diameter
+    trendline: str | None = None  # scatter/bubble: "linear" or "lowess"
+    show_kde: bool = False       # histogram: overlay KDE density curve
 
 
 class ChartResponse(BaseModel):

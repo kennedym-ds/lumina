@@ -141,6 +141,34 @@ export function ChartPanel({ chartId, datasetId }: ChartPanelProps) {
           />
         ) : null}
 
+        {(chart.chartType === "scatter" || chart.chartType === "bubble") ? (
+          <label className="space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trend line</span>
+            <select
+              aria-label="Trend line"
+              value={chart.trendline ?? ""}
+              onChange={(event) => updateChart(chart.chartId, { trendline: event.target.value || null })}
+              className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm text-slate-700"
+            >
+              <option value="">None</option>
+              <option value="linear">Linear + 95% CI</option>
+              <option value="lowess">LOWESS (smooth)</option>
+            </select>
+          </label>
+        ) : null}
+
+        {chart.chartType === "histogram" ? (
+          <label className="flex items-center gap-2 pt-5">
+            <input
+              type="checkbox"
+              checked={chart.show_kde ?? false}
+              onChange={(event) => updateChart(chart.chartId, { show_kde: event.target.checked })}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            <span className="text-sm text-slate-700">Overlay KDE curve</span>
+          </label>
+        ) : null}
+
         {chart.chartType === "heatmap" ? (
           <label className="space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Heatmap aggregation</span>

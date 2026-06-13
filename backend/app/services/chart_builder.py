@@ -8,6 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from scipy import stats
 
@@ -157,9 +158,104 @@ def _make_layout(title: str, x_title: str | None, y_title: str | None, barmode: 
     return layout
 
 
+def _compute_trendline(
+    x_vals: list[float],
+    y_vals: list[float],
+    kind: str,
+) -> tuple[list[float], list[float], list[float] | None, list[float] | None]:
+    """Compute trend line coordinates (x, y) and optional 95% CI bounds.
+
+    Returns (x_trend, y_trend, y_lower, y_upper). CI bounds are None for lowess.
+    """
+    x = np.array(x_vals, dtype=float)
+    y = np.array(y_vals, dtype=float)
+
+    if kind == "linear":
+        coeffs = np.polyfit(x, y, 1)
+        x_sorted = np.linspace(float(x.min()), float(x.max()), 200)
+        y_fit = np.polyval(coeffs, x_sorted)
+
+        n = len(x)
+        if n > 2:
+            x_mean = float(x.mean())
+            ss_xx = float(np.sum((x - x_mean) ** 2))
+            residuals = y - np.polyval(coeffs, x)
+            s = float(np.sqrt(np.sum(residuals**2) / (n - 2)))
+            se = s * np.sqrt(1.0 / n + (x_sorted - x_mean) ** 2 / max(ss_xx, 1e-12))
+            t_crit = float(stats.t.ppf(0.975, df=n - 2))
+            return (
+                x_sorted.tolist(),
+                y_fit.tolist(),
+                (y_fit - t_crit * se).tolist(),
+                (y_fit + t_crit * se).tolist(),
+            )
+        return x_sorted.tolist(), y_fit.tolist(), None, None
+
+    if kind == "lowess":
+        try:
+            from statsmodels.nonparametric.smoothers_lowess import lowess as sm_lowess
+        except ImportError:
+            return [], [], None, None
+        sort_idx = np.argsort(x)
+        smoothed = sm_lowess(y[sort_idx], x[sort_idx], frac=0.3, return_sorted=True)
+        return smoothed[:, 0].tolist(), smoothed[:, 1].tolist(), None, None
+
+    return [], [], None, None
+
+
+def _append_trendline_traces(
+    traces: list[dict[str, Any]],
+    filtered: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    kind: str,
+) -> None:
+    """Add trend line (and optional CI band) traces in-place."""
+    try:
+        x_nums = pd.to_numeric(filtered[x_col], errors="coerce")
+        y_nums = pd.to_numeric(filtered[y_col], errors="coerce")
+        mask = x_nums.notna() & y_nums.notna()
+        if mask.sum() < 3:
+            return
+        tx, ty, ty_lo, ty_hi = _compute_trendline(
+            x_nums[mask].tolist(), y_nums[mask].tolist(), kind
+        )
+        if not tx:
+            return
+        traces.append({
+            "type": "scatter",
+            "mode": "lines",
+            "name": f"{kind.title()} Fit",
+            "x": _to_json_list(tx),
+            "y": _to_json_list(ty),
+            "line": {"dash": "dash", "width": 2, "color": "rgba(60,60,60,0.85)"},
+            "showlegend": True,
+        })
+        if ty_lo is not None and ty_hi is not None:
+            fill_x = tx + list(reversed(tx))
+            fill_y = ty_hi + list(reversed(ty_lo))
+            traces.append({
+                "type": "scatter",
+                "mode": "lines",
+                "name": "95% CI",
+                "x": _to_json_list(fill_x),
+                "y": _to_json_list(fill_y),
+                "fill": "toself",
+                "fillcolor": "rgba(80,80,80,0.15)",
+                "line": {"width": 0},
+                "showlegend": False,
+                "hoverinfo": "skip",
+            })
+    except Exception:
+        pass  # Never let a trend line error hide the main chart
+
+
 def _build_histogram(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
     cols = [request.x] + ([request.color] if request.color else [])
     filtered = df[cols].dropna()
+
+    # KDE overlay requires density normalisation so both curves share the same Y scale
+    hist_norm = "probability density" if request.show_kde else None
 
     traces: list[dict[str, Any]] = []
     if request.color:
@@ -168,9 +264,12 @@ def _build_histogram(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict
                 "type": "histogram",
                 "name": str(color_value),
                 "x": _to_json_list(group[request.x].tolist()),
+                "opacity": 0.6,
             }
             if request.nbins:
                 trace["nbinsx"] = request.nbins
+            if hist_norm:
+                trace["histnorm"] = hist_norm
             traces.append(trace)
     else:
         trace = {
@@ -179,13 +278,36 @@ def _build_histogram(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict
         }
         if request.nbins:
             trace["nbinsx"] = request.nbins
+        if hist_norm:
+            trace["histnorm"] = hist_norm
         traces.append(trace)
+
+    if request.show_kde:
+        try:
+            from app.services.distribution import compute_kde
+            kde_traces = compute_kde(df, request.x, request.color, n_points=200)
+            for kt in kde_traces:
+                group_val = kt["group"]
+                label = group_val if group_val != "__all__" else (request.x if not request.color else None)
+                kde_trace: dict[str, Any] = {
+                    "type": "scatter",
+                    "mode": "lines",
+                    "x": _to_json_list(kt["x"]),
+                    "y": _to_json_list(kt["y"]),
+                    "line": {"width": 2},
+                }
+                kde_trace["name"] = f"KDE — {label}" if label else "KDE"
+                traces.append(kde_trace)
+        except Exception:
+            pass  # Never let KDE failure hide the histogram
 
     layout = _make_layout(
         title=f"Histogram: {request.x}",
         x_title=request.x,
-        y_title="Count",
+        y_title="Density" if request.show_kde else "Count",
     )
+    if request.show_kde:
+        layout["barmode"] = "overlay"
     return traces, len(filtered), False, layout
 
 
@@ -218,6 +340,9 @@ def _build_scatter(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[s
                 "customdata": _to_json_list(filtered.index.tolist()),
             }
         )
+
+    if request.trendline:
+        _append_trendline_traces(traces, filtered, request.x, request.y, request.trendline)
 
     layout = _make_layout(
         title=f"Scatter: {request.y} vs {request.x}",
@@ -602,6 +727,9 @@ def _build_bubble(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[st
             "customdata": _to_json_list(filtered.index.tolist()),
             "marker": {"size": _scale_sizes(filtered), "sizemode": "diameter"},
         })
+
+    if request.trendline:
+        _append_trendline_traces(traces, filtered, request.x, request.y, request.trendline)
 
     title = f"Bubble: {request.y} vs {request.x}"
     if request.size:
