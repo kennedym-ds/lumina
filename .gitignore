@@ -25,6 +25,7 @@ backend/.venv-build/
 # Tauri generated/build artifacts
 src-tauri/gen/
 src-tauri/binaries/
+src-tauri/sidecar/
 src-tauri/Cargo.lock
 
 # Generated icon source (regenerate with scripts/gen-icons.py)

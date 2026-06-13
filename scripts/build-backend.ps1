@@ -24,10 +24,12 @@ $requirementsPath = Join-Path $backendRoot "requirements.txt"
 $pyInstallerBuildPath = Join-Path $backendRoot "build"
 $pyInstallerDistPath = Join-Path $backendRoot "dist"
 
-$tauriBinariesPath = Join-Path $repoRoot "src-tauri\binaries"
-$targetExeName = "lumina-backend-x86_64-pc-windows-msvc.exe"
-$distExePath = Join-Path $pyInstallerDistPath "lumina-backend.exe"
-$finalExePath = Join-Path $tauriBinariesPath $targetExeName
+# --onedir output: backend/dist/lumina-backend/ (lumina-backend.exe + _internal/).
+# Staged as a Tauri resource folder, not an externalBin single file.
+$distBackendDir = Join-Path $pyInstallerDistPath "lumina-backend"
+$distExePath = Join-Path $distBackendDir "lumina-backend.exe"
+$sidecarStageRoot = Join-Path $repoRoot "src-tauri\sidecar"
+$finalBackendDir = Join-Path $sidecarStageRoot "lumina-backend"
 
 function Write-Info {
     param([string]$Message)
@@ -55,7 +57,7 @@ if ($Clean) {
     Write-Info "-Clean enabled: removing previous PyInstaller artifacts and staged binaries"
     Remove-PathIfExists -Path $pyInstallerBuildPath
     Remove-PathIfExists -Path $pyInstallerDistPath
-    Remove-PathIfExists -Path $finalExePath
+    Remove-PathIfExists -Path $finalBackendDir
 }
 
 Write-Info "Recreating clean build virtual environment at $buildVenvPath"
@@ -91,13 +93,15 @@ if (-not (Test-Path -LiteralPath $distExePath)) {
     throw "Expected PyInstaller output not found: $distExePath"
 }
 
-Write-Info "Staging sidecar to Tauri binaries directory"
-if (-not (Test-Path -LiteralPath $tauriBinariesPath)) {
-    New-Item -ItemType Directory -Path $tauriBinariesPath | Out-Null
+Write-Info "Staging onedir sidecar to Tauri resource directory"
+if (-not (Test-Path -LiteralPath $sidecarStageRoot)) {
+    New-Item -ItemType Directory -Path $sidecarStageRoot | Out-Null
 }
 
-Remove-PathIfExists -Path $finalExePath
-Copy-Item -Path $distExePath -Destination $finalExePath
+Remove-PathIfExists -Path $finalBackendDir
+Copy-Item -Path $distBackendDir -Destination $finalBackendDir -Recurse
 
-$sizeMiB = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
-Write-Ok "Sidecar staged at: $finalExePath ($sizeMiB MiB)"
+$sizeMiB = [math]::Round(
+    ((Get-ChildItem -LiteralPath $finalBackendDir -Recurse -File |
+        Measure-Object -Property Length -Sum).Sum) / 1MB, 2)
+Write-Ok "Sidecar staged at: $finalBackendDir ($sizeMiB MiB)"

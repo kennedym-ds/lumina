@@ -56,7 +56,7 @@ function useElapsedSeconds(): number {
 
 function startupMessage(elapsed: number): string {
   if (elapsed < 8) return "Starting Lumina…";
-  if (elapsed < 25) return "Preparing engine — first launch extracts files, this happens once…";
+  if (elapsed < 25) return "Starting the analysis engine…";
   return "Almost ready — your antivirus may be scanning the engine, please wait…";
 }
 

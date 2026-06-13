@@ -75,12 +75,14 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# --onedir layout: a lightweight bootstrap EXE plus a sibling _internal/ folder.
+# Unlike --onefile, this never extracts to %TEMP% at runtime, so startup is fast
+# on every launch and antivirus only scans the files once (at install time).
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="lumina-backend",
     debug=False,
     bootloader_ignore_signals=False,
@@ -88,4 +90,14 @@ exe = EXE(
     upx=True,
     console=True,
     disable_windowed_traceback=False,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name="lumina-backend",
 )
