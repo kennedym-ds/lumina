@@ -1,11 +1,11 @@
 import { DndContext, DragOverlay, type DragStartEvent } from "@dnd-kit/core";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChartGrid } from "@/components/Chart/ChartGrid";
 import { DraggableVariable } from "@/components/ChartBuilder/DraggableVariable";
 import { useChartStore } from "@/stores/chartStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useUndoRedoStore } from "@/stores/undoRedoStore";
-import type { LuminaDtype } from "@/types/eda";
+import type { ChartType, LuminaDtype } from "@/types/eda";
 
 interface ActiveDragState {
   columnName: string;
@@ -22,6 +22,13 @@ export function EdaPlatform() {
   const removeChart = useChartStore((state) => state.removeChart);
   const setActiveChart = useChartStore((state) => state.setActiveChart);
   const clearCharts = useChartStore((state) => state.clearCharts);
+  const updateChart = useChartStore((state) => state.updateChart);
+
+  const handleAddPreset = useCallback((chartType: ChartType) => {
+    const chartId = addChart();
+    updateChart(chartId, { chartType });
+    setActiveChart(chartId);
+  }, [addChart, updateChart, setActiveChart]);
 
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
 
@@ -82,6 +89,7 @@ export function EdaPlatform() {
           activeChartId={activeChartId}
           onSetActiveChart={setActiveChart}
           onAddChart={addChart}
+          onAddPreset={handleAddPreset}
           onRemoveChart={removeChart}
           datasetId={datasetId}
         />

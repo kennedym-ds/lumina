@@ -7,6 +7,7 @@ import { useChartStore } from "@/stores/chartStore";
 import { useCrossFilterStore } from "@/stores/crossFilterStore";
 import { useDatasetStore } from "@/stores/datasetStore";
 import type { ChartConfig, ChartType } from "@/types/eda";
+import type { ColumnInfo } from "@/types/data";
 
 interface ChartPanelProps {
   chartId: string;
@@ -42,6 +43,20 @@ function getHeatmapAggregation(chart: ChartConfig): string {
   return chart.aggregation ?? "count";
 }
 
+function suggestChartTypes(config: ChartConfig, columns: readonly ColumnInfo[]): ReadonlySet<ChartType> {
+  const dtype = (name: string | null) => name ? (columns.find((c) => c.name === name)?.dtype ?? null) : null;
+  const xDtype = dtype(config.x);
+  const yDtype = dtype(config.y);
+
+  if (xDtype === "numeric" && yDtype === "numeric") return new Set<ChartType>(["scatter", "bubble", "density"]);
+  if (xDtype === "categorical" && yDtype === "numeric") return new Set<ChartType>(["box", "violin", "bar", "strip"]);
+  if (xDtype === "datetime" && yDtype === "numeric") return new Set<ChartType>(["line", "area"]);
+  if (xDtype === "categorical" && yDtype === "categorical") return new Set<ChartType>(["heatmap"]);
+  if (xDtype === "numeric" && !config.y) return new Set<ChartType>(["histogram", "qq_plot"]);
+  if (xDtype === "categorical" && !config.y) return new Set<ChartType>(["pie", "bar"]);
+  return new Set<ChartType>();
+}
+
 function supportsValuesField(chart: ChartConfig): boolean {
   if (chart.chartType === "pie") {
     return true;
@@ -67,6 +82,7 @@ export function ChartPanel({ chartId, datasetId }: ChartPanelProps) {
     [columns],
   );
 
+  const suggestedTypes = useMemo(() => (chart ? suggestChartTypes(chart, columns) : new Set<ChartType>()), [chart, columns]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSelected = useCallback(
@@ -92,7 +108,11 @@ export function ChartPanel({ chartId, datasetId }: ChartPanelProps) {
 
   return (
     <div className="flex h-full min-h-[420px] flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <ChartTypeSelector value={chart.chartType} onChange={(chartType) => updateChart(chart.chartId, { chartType })} />
+      <ChartTypeSelector
+        value={chart.chartType}
+        onChange={(chartType) => updateChart(chart.chartId, { chartType })}
+        suggestedTypes={suggestedTypes}
+      />
 
       <div className="grid gap-2 md:grid-cols-2">
         {visibleShelves.has("x") ? (

@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react";
 import { ChartPanel } from "@/components/ChartBuilder/ChartPanel";
 import { EmptyChartState } from "@/components/ChartBuilder/EmptyChartState";
 import { useChartClipboard } from "@/hooks/useChartClipboard";
-import type { ChartConfig } from "@/types/eda";
+import type { ChartConfig, ChartType } from "@/types/eda";
 
 interface ChartGridProps {
   charts: ChartConfig[];
@@ -10,6 +10,7 @@ interface ChartGridProps {
   onSetActiveChart: (chartId: string) => void;
   onAddChart: () => void;
   onRemoveChart: (chartId: string) => void;
+  onAddPreset?: (chartType: ChartType) => void;
   datasetId?: string | null;
 }
 
@@ -31,6 +32,7 @@ export function ChartGrid({
   onSetActiveChart,
   onAddChart,
   onRemoveChart,
+  onAddPreset,
   datasetId = null,
 }: ChartGridProps) {
   const { copyChart } = useChartClipboard();
@@ -59,7 +61,7 @@ export function ChartGrid({
   if (charts.length === 0) {
     return (
       <section className="flex h-full min-h-0 flex-col gap-3">
-        <EmptyChartState onAddChart={onAddChart} />
+        <EmptyChartState onAddChart={onAddChart} onAddPreset={onAddPreset} />
       </section>
     );
   }

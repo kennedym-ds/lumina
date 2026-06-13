@@ -24,6 +24,7 @@ export function VariableList({ onSelectColumn }: VariableListProps) {
   const updateColumns = useDatasetStore((state) => state.updateColumns);
   const toggleColumnExclusion = useDatasetStore((state) => state.toggleColumnExclusion);
   const setError = useDatasetStore((state) => state.setError);
+  const [filterText, setFilterText] = useState("");
   const [pendingColumn, setPendingColumn] = useState<string | null>(null);
   const [castingColumn, setCastingColumn] = useState<string | null>(null);
   const [castSelections, setCastSelections] = useState<Record<string, CastTargetDtype>>({});
@@ -34,6 +35,11 @@ export function VariableList({ onSelectColumn }: VariableListProps) {
     () => [...columns].sort((left, right) => left.name.localeCompare(right.name)),
     [columns],
   );
+
+  const visibleColumns = useMemo(() => {
+    const q = filterText.trim().toLowerCase();
+    return q ? sortedColumns.filter((c) => c.name.toLowerCase().includes(q)) : sortedColumns;
+  }, [sortedColumns, filterText]);
 
   const sortedExcludedColumns = useMemo(
     () => Array.from(excludedColumns).sort((left, right) => left.localeCompare(right)),
@@ -121,11 +127,21 @@ export function VariableList({ onSelectColumn }: VariableListProps) {
     <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <h2 className="mb-3 text-sm font-semibold text-slate-800">Variables</h2>
 
+      {columns.length > 15 ? (
+        <input
+          type="search"
+          placeholder="Search variables…"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          className="mb-2 w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-700 placeholder:text-slate-400 focus:border-lumina-400 focus:outline-none"
+        />
+      ) : null}
+
       {sortedColumns.length === 0 ? (
         <p className="text-xs text-slate-500">No variables yet.</p>
       ) : (
         <ul className="space-y-1">
-          {sortedColumns.map((column) => (
+          {visibleColumns.map((column) => (
             <li key={column.name} className="space-y-2 rounded-md border border-transparent px-1 py-1 hover:border-slate-200">
               <div className="flex items-center gap-2">
                 <button
