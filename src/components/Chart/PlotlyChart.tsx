@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import createPlotlyComponent from "react-plotly.js/factory";
 import Plotly from "plotly.js-dist-min";
-import { OKABE_ITO_COLORWAY } from "@/constants/palette";
+import { PALETTES } from "@/constants/palettes";
+import { useThemeStore } from "@/stores/themeStore";
 import type { ChartResponse } from "@/types/eda";
 
 const Plot = createPlotlyComponent(Plotly);
@@ -52,6 +53,9 @@ export function PlotlyChart({
   onSelected,
   onDeselect,
 }: PlotlyChartProps) {
+  const template = useThemeStore((state) => state.template);
+  const palette = useThemeStore((state) => state.palette);
+  const colorway = PALETTES[palette].colors;
   const hasSelection = selectedRowIds.size > 0;
 
   const displayData = useMemo(() => {
@@ -149,7 +153,9 @@ export function PlotlyChart({
         layout={{
           ...chartResponse.plotly_figure.layout,
           autosize: true,
-          colorway: [...OKABE_ITO_COLORWAY],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          template: template as any,
+          colorway: [...colorway],
           paper_bgcolor: "rgba(0,0,0,0)",
           plot_bgcolor: "rgba(0,0,0,0)",
           dragmode: "select",

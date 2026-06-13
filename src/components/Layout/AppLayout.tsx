@@ -10,6 +10,7 @@ import { FavouritesPanel } from "@/components/Sidebar/FavouritesPanel";
 import { SummaryPanel } from "@/components/Sidebar/SummaryPanel";
 import { ExportChartButton } from "@/components/Toolbar/ExportChartButton";
 import { ExportMenu } from "@/components/Toolbar/ExportMenu";
+import { ThemePicker } from "@/components/Toolbar/ThemePicker";
 import { OpenButton } from "@/components/Toolbar/OpenButton";
 import { ResetSelectionButton } from "@/components/Toolbar/ResetSelectionButton";
 import { SaveButton } from "@/components/Toolbar/SaveButton";
@@ -177,6 +178,7 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
             </div>
           ) : null}
 
+          <ThemePicker />
           <ResetSelectionButton />
           <UndoRedoButtons />
           <SaveViewButton />
