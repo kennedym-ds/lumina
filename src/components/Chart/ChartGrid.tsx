@@ -81,17 +81,32 @@ export function ChartGrid({
               }}
               tabIndex={0}
             >
-              <button
-                type="button"
-                aria-label="Remove chart"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemoveChart(chart.chartId);
-                }}
-                className="absolute right-2 top-2 z-10 rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              >
-                ✕
-              </button>
+              <div className="absolute right-2 top-2 z-10 flex gap-1">
+                <button
+                  type="button"
+                  aria-label="Copy chart image"
+                  title="Copy chart (Ctrl+C)"
+                  onClick={async (event) => {
+                    event.stopPropagation();
+                    const plotlyEl = event.currentTarget.closest("article")?.querySelector<HTMLElement>(".js-plotly-plot");
+                    if (plotlyEl) await copyChart(plotlyEl);
+                  }}
+                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                >
+                  ⎘
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove chart"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveChart(chart.chartId);
+                  }}
+                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              </div>
 
               <ChartPanel chartId={chart.chartId} datasetId={datasetId} />
             </article>
