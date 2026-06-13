@@ -52,9 +52,10 @@ export default function App() {
       <div className="flex h-screen flex-col items-center justify-center gap-4 p-8 text-center">
         <h1 className="text-xl font-semibold text-red-600">Backend failed to start</h1>
         <p className="max-w-md text-sm text-slate-600">
-          The Lumina analysis engine did not respond within 30 seconds. Try restarting
-          the application. If the problem persists, check that your antivirus is not
-          blocking <code className="rounded bg-slate-100 px-1 font-mono">lumina-backend.exe</code>.
+          The Lumina analysis engine did not respond within 90 seconds. On first launch
+          the engine may take longer to start. Try restarting the application. If the
+          problem persists, check that your antivirus is not blocking{" "}
+          <code className="rounded bg-slate-100 px-1 font-mono">lumina-backend.exe</code>.
         </p>
       </div>
     );
@@ -64,7 +65,7 @@ export default function App() {
     return (
       <div className="flex h-screen items-center justify-center gap-3 text-sm text-slate-500">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500" />
-        Starting Lumina…
+        Starting Lumina… (first launch may take up to 60 s)
       </div>
     );
   }

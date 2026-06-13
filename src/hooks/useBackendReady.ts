@@ -5,8 +5,8 @@ interface BackendReadyState {
   timedOut: boolean;
 }
 
-const INITIAL_DELAY_MS = 250;
-const MAX_TOTAL_MS = 30_000;
+const INITIAL_DELAY_MS = 500;
+const MAX_TOTAL_MS = 90_000; // PyInstaller --onefile extracts on first run; AV scans add 30-60s
 
 export function useBackendReady(port: number): BackendReadyState {
   const [state, setState] = useState<BackendReadyState>({ ready: false, timedOut: false });
