@@ -10,17 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Lumina",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 1024,
-        "minHeight": 600,
-        "center": true,
-        "decorations": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": "default-src 'self' tauri: https://tauri.localhost; connect-src 'self' http://127.0.0.1:* tauri: https://tauri.localhost; img-src 'self' data: blob: tauri: https://tauri.localhost; script-src 'self' 'unsafe-eval' tauri: https://tauri.localhost; style-src 'self' 'unsafe-inline' tauri: https://tauri.localhost; font-src 'self' data: tauri: https://tauri.localhost"
     }

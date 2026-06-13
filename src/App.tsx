@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ApiError, getBackendPort } from "@/api/client";
+import { ApiError, getBackendPort, getBootstrapDiagnostics } from "@/api/client";
 import { useUploadFile } from "@/api/data";
 import { AppLayout } from "@/components/Layout/AppLayout";
 import { FileDropZone } from "@/components/Import/FileDropZone";
@@ -90,7 +90,11 @@ export default function App() {
         <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500" />
         <p>{startupMessage(elapsed)}</p>
         {elapsed >= 8 ? (
-          <p className="text-xs text-slate-400">({elapsed}s elapsed)</p>
+          <p className="text-xs text-slate-400">
+            ({elapsed}s · port {getBootstrapDiagnostics().port} ·{" "}
+            cfg {getBootstrapDiagnostics().resolved ? "ok" : "FALLBACK"}
+            {getBootstrapDiagnostics().error ? ` · ${getBootstrapDiagnostics().error}` : ""})
+          </p>
         ) : null}
       </div>
     );

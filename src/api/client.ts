@@ -13,8 +13,30 @@ interface BackendConfig {
 
 let _config: BackendConfig = { port: 8089, token: "dev-token" };
 
+let _bootstrapResolved = false;
+let _bootstrapError: string | null = null;
+
 export function initBackendConfig(config: BackendConfig): void {
   _config = config;
+}
+
+export function setBootstrapResult(resolved: boolean, error: string | null): void {
+  _bootstrapResolved = resolved;
+  _bootstrapError = error;
+}
+
+export function getBootstrapDiagnostics(): {
+  port: number;
+  tokenLen: number;
+  resolved: boolean;
+  error: string | null;
+} {
+  return {
+    port: _config.port,
+    tokenLen: _config.token.length,
+    resolved: _bootstrapResolved,
+    error: _bootstrapError,
+  };
 }
 
 export function getBackendPort(): number {

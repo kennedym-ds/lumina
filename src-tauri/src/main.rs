@@ -31,6 +31,21 @@ fn main() {
                 token: token.clone(),
             });
 
+            // Deliver the backend config to the webview via an initialization
+            // script — it runs before any page JS, so the frontend reads the
+            // real port/token synchronously instead of relying on the IPC bridge
+            // being ready (a dynamic-import IPC path failed silently in release).
+            // The token is alphanumeric, so direct interpolation is injection-safe.
+            let init_script =
+                format!("window.__LUMINA_CONFIG__ = {{ port: {port}, token: \"{token}\" }};");
+            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("Lumina")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(1024.0, 600.0)
+                .center()
+                .initialization_script(&init_script)
+                .build()?;
+
             // Spawn the bundled --onedir backend directly. It lives under the Tauri
             // resource directory as lumina-backend/lumina-backend.exe (+ _internal/).
             // Spawning natively (not via the shell plugin) avoids re-extraction and
