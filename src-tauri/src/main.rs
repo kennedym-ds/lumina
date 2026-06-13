@@ -4,33 +4,30 @@
 use std::sync::Mutex;
 use tauri::Manager;
 
+/// Exposes the resolved backend port and session token to the frontend via IPC.
+/// Called by the React bootstrap before mounting — race-condition-free alternative
+/// to window.eval() which fires before the page context is stable in Tauri 2.
+#[tauri::command]
+fn get_backend_config(state: tauri::State<BackendConfig>) -> BackendConfig {
+    state.inner().clone()
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![get_backend_config])
         .setup(|app| {
-            let port = lumina_lib::find_free_port(8089, 5)
-                .expect("Could not find a free port for the backend");
+            let port = lumina_lib::find_free_port(8089, 5);
             let token = lumina_lib::generate_token();
 
             println!("[lumina] Backend port: {port}");
             println!("[lumina] Auth token generated (length={})", token.len());
 
-            // Store port and token in app state for the frontend to read
             app.manage(BackendConfig {
                 port,
                 token: token.clone(),
             });
-
-            // Inject port and token into the webview via JavaScript
-            let window = app
-                .get_webview_window("main")
-                .expect("main window not found");
-            let js = format!(
-                "window.__LUMINA_API_PORT__ = {}; window.__LUMINA_API_TOKEN__ = \"{}\";",
-                port, token
-            );
-            window.eval(&js)?;
 
             // Spawn the sidecar backend process
             #[cfg(not(debug_assertions))]
@@ -42,8 +39,8 @@ fn main() {
                         .spawn()
                 }) {
                     Ok(sidecar_child) => {
-                        // Keep the child handle alive in app state so the sidecar
-                        // is only killed when the app exits, not when setup() returns.
+                        // Keep the child handle alive so the sidecar isn't killed
+                        // when setup() returns — it must outlive this scope.
                         app.manage(Mutex::new(Some(sidecar_child)));
                         println!("[lumina] Sidecar spawned on port {port}");
                     }
@@ -71,7 +68,7 @@ fn main() {
         .expect("error while running tauri application");
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
 struct BackendConfig {
     port: u16,
     token: String,

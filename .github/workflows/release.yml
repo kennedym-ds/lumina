@@ -55,7 +55,7 @@ jobs:
             src-tauri/target
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-rust-${{ hashFiles('src-tauri/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-rust-
 
@@ -82,7 +82,7 @@ jobs:
         run: bash scripts/build-backend.sh
 
       - name: Build Tauri application
-        run: npm run tauri build
+        run: npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

@@ -1,24 +1,36 @@
 /**
  * HTTP client for communicating with the FastAPI sidecar backend.
  *
- * In production (Tauri), the port and token are injected by the Tauri shell
- * at startup. In development, they fall back to environment variables.
+ * In production (Tauri), port and token are resolved via the `get_backend_config`
+ * IPC command before React mounts (see main.tsx bootstrap). In browser dev mode
+ * the defaults below are used so `npm run dev` keeps working without Tauri.
  */
 
-declare global {
-  interface Window {
-    __LUMINA_API_PORT__?: number;
-    __LUMINA_API_TOKEN__?: string;
-  }
+interface BackendConfig {
+  port: number;
+  token: string;
+}
+
+let _config: BackendConfig = { port: 8089, token: "dev-token" };
+
+export function initBackendConfig(config: BackendConfig): void {
+  _config = config;
+}
+
+export function getBackendPort(): number {
+  return _config.port;
+}
+
+export function getAuthToken(): string {
+  return _config.token;
 }
 
 function getBaseUrl(): string {
-  const port = window.__LUMINA_API_PORT__ ?? 8089;
-  return `http://127.0.0.1:${port}`;
+  return `http://127.0.0.1:${_config.port}`;
 }
 
 function getToken(): string {
-  return window.__LUMINA_API_TOKEN__ ?? "dev-token";
+  return _config.token;
 }
 
 class ApiClient {

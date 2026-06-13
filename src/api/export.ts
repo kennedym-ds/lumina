@@ -1,3 +1,5 @@
+import { getAuthToken, getBackendPort } from "@/api/client";
+
 export type ExportFormat = "csv" | "excel" | "report";
 
 const endpointMap: Record<ExportFormat, string> = {
@@ -13,12 +15,11 @@ const extensionMap: Record<ExportFormat, string> = {
 };
 
 function getBaseUrl(): string {
-  const port = window.__LUMINA_API_PORT__ ?? 8089;
-  return `http://127.0.0.1:${port}`;
+  return `http://127.0.0.1:${getBackendPort()}`;
 }
 
 function getToken(): string {
-  return window.__LUMINA_API_TOKEN__ ?? "dev-token";
+  return getAuthToken();
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { apiClient } from "@/api/client";
+import { apiClient, getAuthToken, getBackendPort } from "@/api/client";
 import type { ExportRequest, LoadRequest, LoadResponse, SaveRequest } from "@/types/project";
 
 export function useSaveProject() {
@@ -15,12 +15,11 @@ export function useLoadProject() {
 }
 
 function getBaseUrl(): string {
-  const port = window.__LUMINA_API_PORT__ ?? 8089;
-  return `http://127.0.0.1:${port}`;
+  return `http://127.0.0.1:${getBackendPort()}`;
 }
 
 function getToken(): string {
-  return window.__LUMINA_API_TOKEN__ ?? "dev-token";
+  return getAuthToken();
 }
 
 export async function exportChart(request: ExportRequest): Promise<Blob> {
