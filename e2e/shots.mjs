@@ -30,9 +30,9 @@ await page.getByRole("button", { name: /Charts/i }).click();
 await page.locator("aside.rounded-lg h2").filter({ hasText: "Variables" }).waitFor({ state: "visible", timeout: 12000 });
 await page.getByRole("button", { name: /^Scatter/i }).first().click();
 await page.waitForTimeout(300);
-await dragTo(page, page.getByText("bill_length_mm").first(), page.locator("text=Drop variable here").first());
+await dragTo(page, page.getByText("bill_length_mm").first(), page.getByText(/Drop a variable/i).first());
 await page.waitForTimeout(400);
-await dragTo(page, page.getByText("bill_depth_mm").first(), page.locator("text=Drop variable here").first());
+await dragTo(page, page.getByText("bill_depth_mm").first(), page.getByText(/Drop a variable/i).first());
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `e2e/screenshots/${prefix}-3-chart.png` });
 

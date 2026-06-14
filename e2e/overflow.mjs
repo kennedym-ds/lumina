@@ -26,9 +26,9 @@ await page.getByRole("button", { name: /^Scatter/i }).first().click();
 await page.waitForTimeout(300);
 const xShelf = page.getByText(/X Axis/i).first().locator("xpath=ancestor::*[1]");
 const yShelf = page.getByText(/Y Axis/i).first().locator("xpath=ancestor::*[1]");
-await dragTo(page, page.getByText("bill_length_mm").first(), page.locator("text=Drop variable here").first());
+await dragTo(page, page.getByText("bill_length_mm").first(), page.getByText(/Drop a variable/i).first());
 await page.waitForTimeout(400);
-await dragTo(page, page.getByText("bill_depth_mm").first(), page.locator("text=Drop variable here").first());
+await dragTo(page, page.getByText("bill_depth_mm").first(), page.getByText(/Drop a variable/i).first());
 await page.waitForTimeout(1500);
 
 const report = await page.evaluate(() => {

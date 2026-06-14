@@ -34,12 +34,13 @@ export function DraggableVariable({ columnName, dtype }: DraggableVariableProps)
       ref={setNodeRef}
       type="button"
       style={style}
-      className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left text-sm text-slate-700 shadow-sm transition hover:border-lumina-300 hover:bg-lumina-50"
+      className="group flex w-full cursor-grab items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left text-sm text-slate-700 shadow-sm transition hover:border-lumina-300 hover:bg-lumina-50 hover:shadow active:cursor-grabbing"
       {...attributes}
       {...listeners}
     >
       <span className="w-5 text-center">{iconByDtype[dtype]}</span>
-      <span className="truncate">{columnName}</span>
+      <span className="truncate flex-1">{columnName}</span>
+      <span aria-hidden="true" className="text-slate-300 opacity-0 transition group-hover:opacity-100">⠿</span>
     </button>
   );
 }
