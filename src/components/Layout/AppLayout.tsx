@@ -227,7 +227,7 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
           >
             {!isSidebarCollapsed ? (
               <>
-                <Panel defaultSize={20} minSize={15} maxSize={35} id="sidebar">
+                <Panel defaultSize="22%" minSize="15%" maxSize="40%" id="sidebar">
                   <aside className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3">
                     <div className="shrink-0">
                       <FilterBuilder />
@@ -250,7 +250,7 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
               </>
             ) : null}
 
-            <Panel defaultSize={isSidebarCollapsed ? 100 : 80} minSize={40} id="main">
+            <Panel defaultSize={isSidebarCollapsed ? "100%" : "78%"} minSize="40%" id="main">
               <main className="h-full min-h-0">
                 {activeTab === "data" ? <DataTable datasetId={datasetId} /> : null}
 
