@@ -40,10 +40,14 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
-    # CORS — only allow the Tauri webview origin
+    # CORS — allow the Tauri webview origin on every platform. WebView2 (Windows)
+    # serves the app from http://tauri.localhost, macOS/Linux use tauri://localhost,
+    # and dev uses http://localhost:1420. Matching by regex avoids per-scheme misses
+    # (an http://tauri.localhost omission silently CORS-blocked every request and hung
+    # startup). All matched origins are local; the bearer token is the real auth.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:1420", "tauri://localhost", "https://tauri.localhost"],
+        allow_origin_regex=r"^(https?|tauri)://(tauri\.localhost|localhost|127\.0\.0\.1)(:\d+)?$",
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -57,7 +61,7 @@ def create_app() -> FastAPI:
     # Health endpoint (no auth required — handled before middleware)
     @app.get("/api/health")
     async def health():
-        return {"status": "ok", "version": "2.2.1"}
+        return {"status": "ok", "version": "2.2.2"}
 
     app.include_router(data_router)
     app.include_router(eda_router)
