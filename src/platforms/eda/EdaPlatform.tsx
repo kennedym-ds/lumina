@@ -73,7 +73,7 @@ export function EdaPlatform() {
       onDragCancel={() => setActiveDrag(null)}
       onDragEnd={() => setActiveDrag(null)}
     >
-      <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[240px_1fr]">
+      <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-slate-800">Variables</h2>
 

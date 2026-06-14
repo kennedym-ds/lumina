@@ -132,7 +132,7 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
 
   return (
     <div className="grid h-screen grid-rows-[auto_1fr] bg-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center gap-4">
           <h1 className="text-xl font-bold text-lumina-700">Lumina</h1>
           <button
@@ -144,7 +144,7 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
           </button>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {datasetId ? (
             <div className="flex items-center rounded-md border border-slate-200 bg-slate-50 p-1">
               <button
@@ -215,20 +215,20 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
             {!isSidebarCollapsed ? (
               <>
                 <Panel defaultSize={20} minSize={15} maxSize={35} id="sidebar">
-                  <aside className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3">
-                    <div className="min-h-0 overflow-auto">
+                  <aside className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3">
+                    <div className="shrink-0">
                       <FilterBuilder />
                     </div>
-                    <div className="min-h-0 overflow-auto">
+                    <div className="shrink-0">
                       <TransformBuilder />
                     </div>
-                    <div className="min-h-0 overflow-auto">
+                    <div className="shrink-0">
                       <VariableList />
                     </div>
-                    <div className="min-h-0 overflow-auto">
+                    <div className="shrink-0">
                       <SummaryPanel />
                     </div>
-                    <div className="min-h-0 overflow-auto">
+                    <div className="shrink-0">
                       <FavouritesPanel />
                     </div>
                   </aside>

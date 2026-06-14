@@ -107,7 +107,7 @@ export function ChartPanel({ chartId, datasetId }: ChartPanelProps) {
   }
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="flex h-full min-h-[420px] min-w-0 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <ChartTypeSelector
         value={chart.chartType}
         onChange={(chartType) => updateChart(chart.chartId, { chartType })}

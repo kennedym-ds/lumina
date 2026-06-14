@@ -67,15 +67,15 @@ export function ChartGrid({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3">
-      <div className={`grid min-h-0 gap-3 ${getGridClassName(charts.length)}`}>
+    <section className="flex h-full min-h-0 min-w-0 flex-col gap-3">
+      <div className={`grid min-h-0 min-w-0 gap-3 ${getGridClassName(charts.length)}`}>
         {charts.map((chart) => {
           const isActive = activeChartId === chart.chartId;
 
           return (
             <article
               key={chart.chartId}
-              className={`relative min-h-[420px] rounded-lg ${isActive ? "ring-2 ring-lumina-200" : ""}`}
+              className={`relative min-h-[420px] min-w-0 rounded-lg ${isActive ? "ring-2 ring-lumina-200" : ""}`}
               onClick={() => onSetActiveChart(chart.chartId)}
               onFocus={() => onSetActiveChart(chart.chartId)}
               onKeyDown={(event) => {
