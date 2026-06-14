@@ -182,6 +182,12 @@ def _encode_features(
     if encoded.shape[1] == 0:
         raise ValueError("No usable independent variables after preprocessing")
 
+    # get_dummies on pandas StringDtype/Categorical columns yields nullable boolean
+    # dummies, and nullable numeric inputs stay as extension dtypes. np.asarray on
+    # those produces an object array that breaks numpy linalg (svd/matrix_rank).
+    # Coerce the whole design matrix to plain float64 so downstream math works.
+    encoded = encoded.astype("float64")
+
     return encoded, encoder_mapping
 
 

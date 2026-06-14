@@ -1561,13 +1561,15 @@ def test_vif_endpoint_flags_high_multicollinearity(client):
     assert entries["x2"]["vif"] > 10
 
 
-def test_vif_endpoint_requires_a_fitted_model(client, regression_csv_bytes):
+def test_vif_endpoint_returns_empty_when_no_model_fitted(client, regression_csv_bytes):
+    # No fitted model is a valid state (the regression tab queries VIF on load),
+    # so it returns an empty result rather than an error.
     dataset_id = _upload_csv(client, regression_csv_bytes)
 
     response = client.get(f"/api/model/{dataset_id}/vif")
 
-    assert response.status_code == 400
-    assert "no fitted model" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    assert response.json()["entries"] == []
 
 
 def test_vif_endpoint_limits_feature_count_to_50(client):
@@ -1627,3 +1629,31 @@ def test_ols_supports_interaction_terms(client):
     coefficients = {row["variable"]: row["coefficient"] for row in response.json()["coefficients"]}
     assert "x1:x2" in coefficients
     assert coefficients["x1:x2"] == pytest.approx(4.0, abs=1e-6)
+
+
+def test_ols_supports_categorical_predictors(client):
+    # A categorical predictor must be auto one-hot encoded (drop_first), not rejected.
+    dataframe = pd.DataFrame(
+        {
+            "group": ["a", "b", "c", "a", "b", "c", "a", "b", "c"],
+            "x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+        }
+    )
+    dataframe["y"] = 2.0 * dataframe["x"] + dataframe["group"].map({"a": 0.0, "b": 5.0, "c": 10.0})
+
+    buffer = io.BytesIO()
+    dataframe.to_csv(buffer, index=False)
+    dataset_id = _upload_csv(client, buffer.getvalue())
+
+    response = _fit_regression(
+        client,
+        dataset_id,
+        {"model_type": "ols", "dependent": "y", "independents": ["group", "x"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    coefficients = {row["variable"] for row in payload["coefficients"]}
+    assert any(name.startswith("group_") for name in coefficients)
+    assert "x" in coefficients
+    assert any("one-hot encoded" in warning for warning in payload.get("warnings", []))

@@ -10,11 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.main import create_app
 
 
-EXPECTED_CORS_ORIGINS = {
-    "http://localhost:1420",
-    "tauri://localhost",
+# Origins the webview/dev server legitimately use and must be allowed. Windows
+# WebView2 serves from http://tauri.localhost (this exact origin was previously
+# missing and CORS-blocked every request).
+ALLOWED_CORS_ORIGINS = {
+    "http://tauri.localhost",
     "https://tauri.localhost",
+    "tauri://localhost",
+    "http://localhost:1420",
+    "http://127.0.0.1:8089",
 }
+REJECTED_CORS_ORIGINS = {"https://evil.example.com", "http://example.org"}
 
 
 def test_main_binds_to_loopback_only() -> None:
@@ -37,10 +43,14 @@ def test_health_endpoint_returns_expected_shape_and_version(client) -> None:
 
 
 def test_cors_origins_are_restricted_to_expected_values() -> None:
-    """CORS allowlist should include only intended desktop dev origins."""
+    """CORS regex should allow the local webview/dev origins and reject others."""
 
     app = create_app()
     cors_middleware = next((item for item in app.user_middleware if item.cls is CORSMiddleware), None)
 
     assert cors_middleware is not None
-    assert set(cors_middleware.kwargs["allow_origins"]) == EXPECTED_CORS_ORIGINS
+    pattern = re.compile(cors_middleware.kwargs["allow_origin_regex"])
+    for origin in ALLOWED_CORS_ORIGINS:
+        assert pattern.fullmatch(origin), f"{origin} should be allowed"
+    for origin in REJECTED_CORS_ORIGINS:
+        assert not pattern.fullmatch(origin), f"{origin} should be rejected"

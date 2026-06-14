@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import pandas as pd
 from fastapi import APIRouter, HTTPException
 from sklearn.metrics import accuracy_score, f1_score
 
@@ -126,26 +125,6 @@ async def fit_regression(dataset_id: str, request: RegressionRequest):
         raise HTTPException(status_code=400, detail="train_test_split must be in (0, 1]")
 
     active_dataframe = session.active_dataframe
-
-    # All supported models require numeric predictors. Categorical/text predictors
-    # would otherwise fail deep in fitting with an opaque "Model fitting failed"
-    # message — surface a clear, actionable error naming the offending columns.
-    non_numeric_predictors = [
-        column
-        for column in request.independents
-        if column in active_dataframe.columns
-        and not pd.api.types.is_numeric_dtype(active_dataframe[column])
-    ]
-    if non_numeric_predictors:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Categorical predictors aren't supported yet: "
-                f"{', '.join(non_numeric_predictors)}. "
-                "Pick numeric predictors, or encode these columns to numeric first "
-                "(e.g. cast them in the Data tab)."
-            ),
-        )
 
     try:
         if request.model_type == "ols":
