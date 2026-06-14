@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import createPlotlyComponent from "react-plotly.js/factory";
 import Plotly from "plotly.js-dist-min";
+import type * as PlotlyTypes from "plotly.js";
 import { PALETTES } from "@/constants/palettes";
 import { useThemeStore } from "@/stores/themeStore";
 import type { ChartResponse } from "@/types/eda";
@@ -9,6 +10,19 @@ const Plot = createPlotlyComponent(Plotly);
 const EMPTY_SELECTED_ROW_IDS = new Set<number>();
 
 type PlotlyTrace = Record<string, unknown>;
+
+/**
+ * Remove any fixed `width`/`height` the backend put on the figure layout (e.g.
+ * faceted charts set height = 320 * rows). A fixed height is honoured by Plotly
+ * even with autosize, so the chart renders taller than its container and spills
+ * outside the card. Stripping these lets the chart fully autosize to its box.
+ */
+function stripFixedSize(layout: Partial<PlotlyTypes.Layout>): Partial<PlotlyTypes.Layout> {
+  const { width: _width, height: _height, ...rest } = layout as Record<string, unknown>;
+  void _width;
+  void _height;
+  return rest as Partial<PlotlyTypes.Layout>;
+}
 
 function toRowId(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -151,7 +165,7 @@ export function PlotlyChart({
       <Plot
         data={displayData}
         layout={{
-          ...chartResponse.plotly_figure.layout,
+          ...stripFixedSize(chartResponse.plotly_figure.layout),
           autosize: true,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           template: template as any,
