@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmptyState } from "@/components/Layout/EmptyState";
 import { useDatasetStore } from "@/stores/datasetStore";
@@ -92,12 +92,7 @@ describe("EmptyState", () => {
 
     render(<EmptyState onUpload={vi.fn()} isUploading={false} />);
 
-    const penguinsCard = screen.getByText("Palmer Penguins").closest("article");
-    if (!penguinsCard) {
-      throw new Error("Palmer Penguins card not found");
-    }
-
-    fireEvent.click(within(penguinsCard).getByRole("button", { name: /load/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Palmer Penguins/i }));
 
     await waitFor(() => {
       expect(mutateAsync).toHaveBeenCalledWith("palmer_penguins");
@@ -114,12 +109,8 @@ describe("EmptyState", () => {
 
     render(<EmptyState onUpload={vi.fn()} isUploading={false} />);
 
-    const irisCard = screen.getByText("Iris").closest("article");
-    if (!irisCard) {
-      throw new Error("Iris card not found");
-    }
-
-    const loadingButton = within(irisCard).getByRole("button", { name: /loading/i }) as HTMLButtonElement;
-    expect(loadingButton.disabled).toBe(true);
+    const irisButton = screen.getByRole("button", { name: /Iris/i }) as HTMLButtonElement;
+    expect(irisButton.textContent).toMatch(/loading/i);
+    expect(irisButton.disabled).toBe(true);
   });
 });

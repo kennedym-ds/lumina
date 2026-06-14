@@ -1,4 +1,3 @@
-import type { KeyboardEvent } from "react";
 import { ChartPanel } from "@/components/ChartBuilder/ChartPanel";
 import { EmptyChartState } from "@/components/ChartBuilder/EmptyChartState";
 import { useChartClipboard } from "@/hooks/useChartClipboard";
@@ -14,17 +13,26 @@ interface ChartGridProps {
   datasetId?: string | null;
 }
 
-function getGridClassName(chartCount: number): string {
-  if (chartCount <= 1) {
-    return "grid-cols-1";
-  }
+const CHART_TYPE_LABEL: Record<ChartType, string> = {
+  histogram: "Histogram",
+  scatter: "Scatter",
+  box: "Box",
+  bar: "Bar",
+  line: "Line",
+  violin: "Violin",
+  heatmap: "Heatmap",
+  density: "Density",
+  pie: "Pie",
+  area: "Area",
+  qq_plot: "Q-Q",
+  bubble: "Bubble",
+  strip: "Strip",
+  error_bar: "Error Bar",
+  treemap: "Treemap",
+  parallel_coords: "Parallel",
+};
 
-  if (chartCount === 2) {
-    return "grid-cols-1 xl:grid-cols-2";
-  }
-
-  return "grid-cols-1 xl:grid-cols-2";
-}
+const MAX_CHARTS = 8;
 
 export function ChartGrid({
   charts,
@@ -37,27 +45,6 @@ export function ChartGrid({
 }: ChartGridProps) {
   const { copyChart } = useChartClipboard();
 
-  const handleChartKeyDown = async (event: KeyboardEvent<HTMLElement>, chartId: string) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onSetActiveChart(chartId);
-      return;
-    }
-
-    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "c") {
-      return;
-    }
-
-    const host = event.currentTarget;
-    const plotlyElement = host.querySelector<HTMLElement>(".js-plotly-plot");
-    if (!plotlyElement) {
-      return;
-    }
-
-    event.preventDefault();
-    await copyChart(plotlyElement);
-  };
-
   if (charts.length === 0) {
     return (
       <section className="flex h-full min-h-0 flex-col gap-3">
@@ -66,66 +53,85 @@ export function ChartGrid({
     );
   }
 
+  const activeId = charts.some((chart) => chart.chartId === activeChartId) ? activeChartId : charts[0].chartId;
+  const activeChart = charts.find((chart) => chart.chartId === activeId) ?? charts[0];
+
+  const handleCopy = async () => {
+    const element = document.querySelector<HTMLElement>(
+      `[data-chart-panel="${activeChart.chartId}"] .js-plotly-plot`,
+    );
+    if (element) {
+      await copyChart(element);
+    }
+  };
+
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col gap-3">
-      <div className={`grid min-h-0 min-w-0 gap-3 ${getGridClassName(charts.length)}`}>
-        {charts.map((chart) => {
-          const isActive = activeChartId === chart.chartId;
-
-          return (
-            <article
-              key={chart.chartId}
-              className={`relative min-h-[420px] min-w-0 rounded-lg ${isActive ? "ring-2 ring-lumina-200" : ""}`}
-              onClick={() => onSetActiveChart(chart.chartId)}
-              onFocus={() => onSetActiveChart(chart.chartId)}
-              onKeyDown={(event) => {
-                void handleChartKeyDown(event, chart.chartId);
-              }}
-              tabIndex={0}
-            >
-              <div className="absolute right-2 top-2 z-10 flex gap-1">
+      {/* Tabs — one per chart, swap between plots */}
+      <div className="flex items-center gap-1 border-b border-slate-200">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {charts.map((chart, index) => {
+            const isActive = chart.chartId === activeId;
+            return (
+              <div
+                key={chart.chartId}
+                className={`group flex shrink-0 items-center gap-1 border-b-2 px-3 py-1.5 text-sm transition ${
+                  isActive
+                    ? "border-lumina-500 font-medium text-lumina-700"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
                 <button
                   type="button"
-                  aria-label="Copy chart image"
-                  title="Copy chart (Ctrl+C)"
-                  onClick={async (event) => {
-                    event.stopPropagation();
-                    const plotlyEl = event.currentTarget.closest("article")?.querySelector<HTMLElement>(".js-plotly-plot");
-                    if (plotlyEl) await copyChart(plotlyEl);
-                  }}
-                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                  onClick={() => onSetActiveChart(chart.chartId)}
+                  className="whitespace-nowrap"
                 >
-                  ⎘
+                  {index + 1}. {CHART_TYPE_LABEL[chart.chartType]}
                 </button>
-                <button
-                  type="button"
-                  aria-label="Remove chart"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRemoveChart(chart.chartId);
-                  }}
-                  className="rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                >
-                  ✕
-                </button>
+                {charts.length > 1 ? (
+                  <button
+                    type="button"
+                    aria-label="Remove chart"
+                    onClick={() => onRemoveChart(chart.chartId)}
+                    className="rounded p-0.5 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
+                  >
+                    ✕
+                  </button>
+                ) : null}
               </div>
+            );
+          })}
+        </div>
 
-              <ChartPanel chartId={chart.chartId} datasetId={datasetId} />
-            </article>
-          );
-        })}
+        {charts.length < MAX_CHARTS ? (
+          <button
+            type="button"
+            onClick={onAddChart}
+            aria-label="Add chart"
+            title="Add chart"
+            className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium text-lumina-700 transition hover:bg-lumina-50"
+          >
+            <span aria-hidden="true">＋</span>
+            <span>Add</span>
+          </button>
+        ) : null}
       </div>
 
-      {charts.length < 8 ? (
+      {/* Active chart — fills the available area */}
+      <div className="relative min-h-0 min-w-0 flex-1" data-chart-panel={activeChart.chartId}>
         <button
           type="button"
-          onClick={onAddChart}
-          className="inline-flex w-fit items-center gap-2 rounded-md border border-lumina-300 bg-white px-3 py-2 text-sm font-medium text-lumina-700 hover:bg-lumina-50"
+          aria-label="Copy chart image"
+          title="Copy chart to clipboard"
+          onClick={() => {
+            void handleCopy();
+          }}
+          className="absolute right-2 top-2 z-10 rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
         >
-          <span aria-hidden="true">＋</span>
-          <span>Add Chart</span>
+          ⎘
         </button>
-      ) : null}
+        <ChartPanel chartId={activeChart.chartId} datasetId={datasetId} />
+      </div>
     </section>
   );
 }

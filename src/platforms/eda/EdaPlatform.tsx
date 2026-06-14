@@ -31,6 +31,7 @@ export function EdaPlatform() {
   }, [addChart, updateChart, setActiveChart]);
 
   const [activeDrag, setActiveDrag] = useState<ActiveDragState | null>(null);
+  const [varsCollapsed, setVarsCollapsed] = useState(false);
 
   useEffect(() => {
     clearCharts();
@@ -73,26 +74,58 @@ export function EdaPlatform() {
       onDragCancel={() => setActiveDrag(null)}
       onDragEnd={() => setActiveDrag(null)}
     >
-      <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Variables</h2>
+      <div
+        className={`grid h-full min-h-0 gap-3 ${
+          varsCollapsed ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)]"
+        }`}
+      >
+        {!varsCollapsed ? (
+          <aside className="flex min-h-0 flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-800">Variables</h2>
+              <button
+                type="button"
+                onClick={() => setVarsCollapsed(true)}
+                aria-label="Collapse variables"
+                title="Collapse variables panel"
+                className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              >
+                «
+              </button>
+            </div>
 
-          <div className="space-y-2 overflow-auto">
-            {sortedColumns.map((column) => (
-              <DraggableVariable key={column.name} columnName={column.name} dtype={column.dtype} />
-            ))}
+            <div className="space-y-2 overflow-auto">
+              {sortedColumns.map((column) => (
+                <DraggableVariable key={column.name} columnName={column.name} dtype={column.dtype} />
+              ))}
+            </div>
+          </aside>
+        ) : null}
+
+        <div className="flex min-h-0 min-w-0 flex-col gap-2">
+          {varsCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setVarsCollapsed(false)}
+              className="inline-flex w-fit shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              <span aria-hidden="true">»</span>
+              <span>Show variables</span>
+            </button>
+          ) : null}
+
+          <div className="min-h-0 min-w-0 flex-1">
+            <ChartGrid
+              charts={charts}
+              activeChartId={activeChartId}
+              onSetActiveChart={setActiveChart}
+              onAddChart={addChart}
+              onAddPreset={handleAddPreset}
+              onRemoveChart={removeChart}
+              datasetId={datasetId}
+            />
           </div>
-        </aside>
-
-        <ChartGrid
-          charts={charts}
-          activeChartId={activeChartId}
-          onSetActiveChart={setActiveChart}
-          onAddChart={addChart}
-          onAddPreset={handleAddPreset}
-          onRemoveChart={removeChart}
-          datasetId={datasetId}
-        />
+        </div>
       </div>
 
       <DragOverlay>
