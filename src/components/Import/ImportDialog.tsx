@@ -27,6 +27,7 @@ interface ImportDialogProps {
   isUploading: boolean;
   buttonLabel?: string;
   buttonClassName?: string;
+  showFormatsHint?: boolean;
 }
 
 function getApiErrorMessage(error: unknown): string {
@@ -48,6 +49,7 @@ export function ImportDialog({
   isUploading,
   buttonLabel = "Import File",
   buttonClassName,
+  showFormatsHint = true,
 }: ImportDialogProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [lastSelectedFile, setLastSelectedFile] = useState<File | null>(null);
@@ -145,7 +147,7 @@ export function ImportDialog({
         >
           {isUploading ? "Uploading..." : buttonLabel}
         </button>
-        <p className="mt-1 text-xs text-slate-500">{SUPPORTED_FORMATS_LABEL}</p>
+        {showFormatsHint ? <p className="mt-1 text-xs text-slate-500">{SUPPORTED_FORMATS_LABEL}</p> : null}
       </div>
 
       {sheets.length > 0 ? (

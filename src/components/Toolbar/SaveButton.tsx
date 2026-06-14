@@ -3,7 +3,11 @@ import { serializeProject } from "@/services/projectSerializer";
 
 interface SaveButtonProps {
   onSaved?: () => void;
+  className?: string;
 }
+
+const DEFAULT_BUTTON_CLASS =
+  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 function ensureLuminaExtension(path: string): string {
   return path.toLowerCase().endsWith(".lumina") ? path : `${path}.lumina`;
@@ -27,7 +31,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unable to save project.";
 }
 
-export function SaveButton({ onSaved }: SaveButtonProps) {
+export function SaveButton({ onSaved, className }: SaveButtonProps) {
   const saveProject = useSaveProject();
 
   const handleSave = async () => {
@@ -61,7 +65,7 @@ export function SaveButton({ onSaved }: SaveButtonProps) {
       type="button"
       onClick={handleSave}
       disabled={saveProject.isPending}
-      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className={className ?? DEFAULT_BUTTON_CLASS}
     >
       {saveProject.isPending ? "Saving..." : "Save"}
     </button>

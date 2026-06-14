@@ -1,6 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
-import { usePlugins } from "@/api/plugins";
 import { FilterBuilder } from "@/components/FilterBuilder/FilterBuilder";
 import { TransformBuilder } from "@/components/TransformBuilder/TransformBuilder";
 import { DataTable } from "@/components/DataTable/DataTable";
@@ -11,6 +10,7 @@ import { SummaryPanel } from "@/components/Sidebar/SummaryPanel";
 import { ExportChartButton } from "@/components/Toolbar/ExportChartButton";
 import { ExportMenu } from "@/components/Toolbar/ExportMenu";
 import { ThemePicker } from "@/components/Toolbar/ThemePicker";
+import { ToolbarMenu, MENU_ITEM_CLASS } from "@/components/Toolbar/ToolbarMenu";
 import { OpenButton } from "@/components/Toolbar/OpenButton";
 import { ResetSelectionButton } from "@/components/Toolbar/ResetSelectionButton";
 import { SaveButton } from "@/components/Toolbar/SaveButton";
@@ -23,7 +23,6 @@ import { VariableList } from "@/components/Sidebar/VariableList";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useUndoRedoStore } from "@/stores/undoRedoStore";
 import type { UploadResponse } from "@/types/data";
-import { countPlugins } from "@/types/plugins";
 
 type AppTab = "data" | string;
 
@@ -35,11 +34,9 @@ interface AppLayoutProps {
 export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<AppTab>("data");
-  const { data: plugins } = usePlugins();
   const { isDirty, markClean } = useUnsavedChanges();
   const datasetId = useDatasetStore((state) => state.datasetId);
   const fileName = useDatasetStore((state) => state.fileName);
-  const pluginCount = countPlugins(plugins);
   const activePlatform = platforms.find((platform) => platform.id === activeTab);
   const ActivePlatformComponent = activePlatform?.component ?? null;
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
@@ -178,25 +175,41 @@ export function AppLayout({ onUpload, isUploading }: AppLayoutProps) {
             </div>
           ) : null}
 
+          {datasetId ? (
+            <>
+              <p className="max-w-[200px] truncate text-sm font-medium text-slate-700" title={fileName ?? undefined}>
+                {fileName}
+              </p>
+              {isDirty ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  Unsaved
+                </span>
+              ) : null}
+              <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
+            </>
+          ) : null}
+
           <ThemePicker />
-          <ResetSelectionButton />
-          <UndoRedoButtons />
-          <SaveViewButton />
-          <OpenButton onLoaded={markClean} />
-          <SaveButton onSaved={markClean} />
-          <ExportMenu />
-          <ExportChartButton />
 
-          {isDirty ? <span className="text-xs font-medium text-amber-700">Unsaved changes</span> : null}
+          {datasetId ? (
+            <>
+              <ResetSelectionButton />
+              <UndoRedoButtons />
+              <span className="mx-1 h-6 w-px bg-slate-200" aria-hidden="true" />
+              <ToolbarMenu label="File">
+                <OpenButton onLoaded={markClean} className={MENU_ITEM_CLASS} />
+                <SaveButton onSaved={markClean} className={MENU_ITEM_CLASS} />
+                <SaveViewButton className={MENU_ITEM_CLASS} />
+              </ToolbarMenu>
+              <ExportMenu />
+              <ExportChartButton />
+            </>
+          ) : (
+            <OpenButton onLoaded={markClean} />
+          )}
 
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
-            {pluginCount} plugins loaded
-          </span>
-
-          <p className="max-w-[260px] truncate text-sm text-slate-600" title={fileName ?? "No dataset selected"}>
-            {fileName ?? "No dataset selected"}
-          </p>
-          <ImportDialog onUpload={onUpload} isUploading={isUploading} />
+          <ImportDialog onUpload={onUpload} isUploading={isUploading} showFormatsHint={false} />
         </div>
       </header>
 

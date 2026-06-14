@@ -9,7 +9,11 @@ import type { ChartConfig, ChartType } from "@/types/eda";
 
 interface OpenButtonProps {
   onLoaded?: () => void;
+  className?: string;
 }
+
+const DEFAULT_BUTTON_CLASS =
+  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 async function getOpenPath(): Promise<string | null> {
   try {
@@ -30,7 +34,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unable to open project.";
 }
 
-export function OpenButton({ onLoaded }: OpenButtonProps) {
+export function OpenButton({ onLoaded, className }: OpenButtonProps) {
   const loadProject = useLoadProject();
 
   const handleOpen = async () => {
@@ -122,7 +126,7 @@ export function OpenButton({ onLoaded }: OpenButtonProps) {
       type="button"
       onClick={handleOpen}
       disabled={loadProject.isPending}
-      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className={className ?? DEFAULT_BUTTON_CLASS}
     >
       {loadProject.isPending ? "Opening..." : "Open"}
     </button>

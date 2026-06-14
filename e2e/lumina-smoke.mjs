@@ -108,8 +108,8 @@ async function run() {
     console.log("\n─── 2. Load sample dataset ─────────────────────────────────");
 
     // Click the "Load" button inside the Palmer Penguins card
-    const penguinsArticle = page.locator("article").filter({ hasText: "Palmer Penguins" });
-    const loadBtn = penguinsArticle.getByRole("button", { name: "Load" });
+    const penguinsArticle = page.getByRole("button").filter({ hasText: "Palmer Penguins" });
+    const loadBtn = penguinsArticle;
     await loadBtn.click();
 
     // Wait for the data table or the tab bar to appear (dataset loaded)
