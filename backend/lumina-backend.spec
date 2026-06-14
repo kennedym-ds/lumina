@@ -25,6 +25,10 @@ HIDDEN_IMPORT_ROOTS = [
     "openpyxl",
     "plotly",
     "kaleido",
+    # Starlette imports python_multipart lazily inside a try/except (file uploads),
+    # so static analysis misses it and uploads crash the worker at runtime.
+    "python_multipart",
+    "multipart",
 ]
 
 # Explicit modules that are frequently resolved dynamically.
@@ -40,6 +44,10 @@ EXTRA_HIDDEN_IMPORTS = [
     "openpyxl.cell._writer",
     "plotly.io._kaleido",
     "kaleido.scopes.plotly",
+    "python_multipart",
+    "python_multipart.multipart",
+    "multipart",
+    "multipart.multipart",
 ]
 
 hiddenimports = sorted(

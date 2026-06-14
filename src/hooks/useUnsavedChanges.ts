@@ -49,61 +49,13 @@ export function useUnsavedChanges(): UnsavedChangesResult {
     };
   }, []);
 
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!isDirtyRef.current) {
-        return;
-      }
-
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
-
-  useEffect(() => {
-    let unlistenCloseRequested: (() => void) | undefined;
-
-    const setupTauriCloseGuard = async () => {
-      try {
-        const [{ getCurrentWindow }, { confirm }] = await Promise.all([
-          import("@tauri-apps/api/window"),
-          import("@tauri-apps/plugin-dialog"),
-        ]);
-
-        const appWindow = getCurrentWindow();
-        unlistenCloseRequested = await appWindow.onCloseRequested(async (event) => {
-          if (!isDirtyRef.current) {
-            return;
-          }
-
-          const shouldDiscard = await confirm("You have unsaved changes. Close without saving?", {
-            title: "Unsaved changes",
-            kind: "warning",
-            okLabel: "Discard",
-            cancelLabel: "Keep editing",
-          });
-
-          if (!shouldDiscard) {
-            event.preventDefault();
-          }
-        });
-      } catch {
-        // Not running in Tauri context.
-      }
-    };
-
-    void setupTauriCloseGuard();
-
-    return () => {
-      unlistenCloseRequested?.();
-    };
-  }, []);
+  // NOTE: no close-time guard (neither `beforeunload` nor Tauri `onCloseRequested`).
+  // Both intercept the window close in the WebView2 webview and reliably broke the
+  // close/X button once the app was interactive (the async confirm held the close
+  // open without ever rendering a dialog). A working close button outweighs a
+  // close-time "unsaved changes" prompt — the toolbar still surfaces `isDirty`, and
+  // an explicit Save action remains. A safe destroy-based guard can be reintroduced
+  // later behind the window destroy permission.
 
   return { isDirty, markClean };
 }

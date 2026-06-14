@@ -33,7 +33,7 @@ def test_health_endpoint_returns_expected_shape_and_version(client) -> None:
     response = client.get("/api/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "2.2.2"}
+    assert response.json() == {"status": "ok", "version": "2.2.3"}
 
 
 def test_cors_origins_are_restricted_to_expected_values() -> None:

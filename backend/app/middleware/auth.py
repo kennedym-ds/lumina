@@ -15,6 +15,14 @@ class BearerTokenMiddleware(BaseHTTPMiddleware):
         self.token = token
 
     async def dispatch(self, request: Request, call_next):
+        # Let CORS preflight requests through. Browsers send OPTIONS without
+        # credentials before any authenticated cross-origin request (e.g. the
+        # WebView2 webview uploading a file). Rejecting the preflight with 401
+        # makes the browser block the real request, so the whole UI appears to
+        # fail ("can't open a dataset"). The CORS middleware answers OPTIONS.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip auth for health endpoint and docs
         if request.url.path in ("/api/health", "/api/docs", "/api/openapi.json"):
             return await call_next(request)
