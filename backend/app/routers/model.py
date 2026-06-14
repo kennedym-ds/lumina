@@ -301,8 +301,11 @@ async def get_vif(dataset_id: str):
 
     session = _get_session(dataset_id)
 
+    # No model fitted yet is a valid state, not an error — the regression tab
+    # queries VIF on load before the user fits anything. Return an empty result
+    # so it doesn't surface as a console/network error.
     if session.fitted_model is None:
-        raise HTTPException(status_code=400, detail="No fitted model available")
+        return VIFResponse(entries=[], n_observations=0)
 
     config = session.model_config_dict
     try:
