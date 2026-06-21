@@ -1,6 +1,6 @@
 # Lumina Architecture
 
-> System architecture reference for Lumina v1.0.0.
+> System architecture reference for Lumina v2.x.
 
 ## Table of Contents
 
@@ -84,12 +84,22 @@ The frontend is a single-page application. State is split between React Query (s
 ```
 src/
 ├── api/           # HTTP client wrappers (React Query hooks)
-│   ├── client.ts  # Base ApiClient — reads port/token from window globals
-│   ├── data.ts    # /api/data endpoints
-│   ├── eda.ts     # /api/eda endpoints
-│   ├── model.ts   # /api/model endpoints
-│   ├── project.ts # /api/project endpoints
-│   └── views.ts   # /api/views endpoints
+│   ├── client.ts        # Base ApiClient — reads port/token from window globals
+│   ├── data.ts          # /api/data endpoints
+│   ├── eda.ts           # /api/eda endpoints (charts)
+│   ├── profiling.ts     # /api/profiling + correlation
+│   ├── inference.ts     # /api/inference (hypothesis tests, Bayesian)
+│   ├── model.ts         # /api/model (regression, profiler)
+│   ├── spc.ts           # /api/spc (control charts, capability)
+│   ├── multivariate.ts  # /api/multivariate (PCA, clustering)
+│   ├── doe.ts           # /api/doe (design generation)
+│   ├── curve_fit.ts     # /api/curvefit (nonlinear fitting)
+│   ├── transforms.ts    # /api/transforms (computed columns)
+│   ├── filters.ts       # row filters
+│   ├── export.ts        # /api/export (charts, reports, data)
+│   ├── samples.ts       # bundled sample datasets
+│   ├── project.ts       # /api/project endpoints
+│   └── views.ts         # /api/views endpoints
 │
 ├── stores/        # Zustand state slices
 │   ├── chartStore.ts        # Chart configs, active chart, undo history
@@ -100,8 +110,16 @@ src/
 │
 ├── platforms/     # Feature areas (lazy-loaded)
 │   ├── registry.ts          # Platform registry — add new platforms here
-│   ├── eda/                 # Chart Builder platform
-│   └── regression/          # Regression platform
+│   ├── eda/                 # Chart Builder (Charts)
+│   ├── profiling/           # Dataset profiling (Profile)
+│   ├── distribution/        # Distribution overlays
+│   ├── inference/           # Hypothesis testing + Bayesian (Inference)
+│   ├── regression/          # Regression + prediction profiler
+│   ├── spc/                 # Control charts + capability (Quality)
+│   ├── multivariate/        # PCA + clustering (Multivariate)
+│   ├── doe/                 # Design of experiments (DOE)
+│   ├── curvefit/            # Nonlinear curve fitting (Curve Fit)
+│   └── dashboard/           # Multi-panel dashboards
 │
 ├── components/    # Shared UI components
 │   ├── Chart/               # Plotly chart wrapper
@@ -141,11 +159,19 @@ backend/app/
 ├── middleware/
 │   └── auth.py    # BearerTokenMiddleware
 └── routers/
-    ├── data.py    # POST /api/data/upload, GET /api/data/{id}/rows, ...
-    ├── eda.py     # POST /api/eda/chart
-    ├── model.py   # POST /api/model/fit, GET /api/model/results
-    ├── project.py # POST /api/project/save, POST /api/project/load
-    └── views.py   # GET/POST /api/views
+    ├── data.py        # POST /api/data/upload, GET /api/data/{id}/rows, ...
+    ├── eda.py         # POST /api/eda/chart, /distribution
+    ├── transforms.py  # computed columns, filters
+    ├── inference.py   # hypothesis tests, Bayesian inference
+    ├── model.py       # regression fit/results/predict, /profiler
+    ├── spc.py         # control charts, process capability
+    ├── multivariate.py# PCA, K-Means clustering
+    ├── doe.py         # design-of-experiments generation
+    ├── curve_fit.py   # nonlinear curve fitting
+    ├── export.py      # chart/report/data export
+    ├── plugins.py     # plugin discovery
+    ├── project.py     # POST /api/project/save, /load
+    └── views.py       # GET/POST /api/views
 ```
 
 **Router responsibilities:**
@@ -153,8 +179,16 @@ backend/app/
 | Router | Endpoints | Purpose |
 |--------|-----------|---------|
 | `data` | `/api/data/upload`, `/api/data/{id}/rows`, `/api/data/{id}/columns` | File ingestion, row pagination, column metadata |
-| `eda` | `/api/eda/chart` | Compute chart data (aggregations, binning, downsampling) |
-| `model` | `/api/model/fit`, `/api/model/results`, `/api/model/predict` | OLS / logistic regression via statsmodels |
+| `eda` | `/api/eda/chart`, `/api/eda/{id}/distribution` | Chart data (aggregations, binning, downsampling), KDE |
+| `transforms` | `/api/transforms/...` | Computed columns and row filters |
+| `inference` | `/api/inference/...` | t-tests, chi-square, ANOVA, Bayesian inference |
+| `model` | `/api/model/fit`, `/results`, `/predict`, `/{id}/profiler` | Regression (OLS/logistic/regularized/tree) + prediction profiler |
+| `spc` | `/api/spc/{id}/control-chart`, `/capability` | Control charts and process capability |
+| `multivariate` | `/api/multivariate/{id}/pca`, `/clustering` | PCA and K-Means clustering |
+| `doe` | `/api/doe/design` | Experimental design generation |
+| `curve_fit` | `/api/curvefit/models`, `/{id}/fit` | Nonlinear least-squares curve fitting |
+| `export` | `/api/export/...` | Chart (PNG/SVG), report (MD/HTML), data (CSV/Excel) export |
+| `plugins` | `/api/plugins/` | Plugin discovery |
 | `project` | `/api/project/save`, `/api/project/load` | Serialize/deserialize `.lumina` project files |
 | `views` | `/api/views` | Save and retrieve named chart configurations |
 

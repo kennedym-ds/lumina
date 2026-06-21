@@ -1,7 +1,7 @@
 ---
 title: "Building Lumina installers"
-version: "1.0.0"
-lastUpdated: "2026-03-11"
+version: "1.1.0"
+lastUpdated: "2026-06-21"
 status: "active"
 ---
 
@@ -21,7 +21,7 @@ Relevant files:
 - `scripts/build-tauri.sh` — macOS/Linux installer build.
 - `backend/lumina-backend.spec` — PyInstaller spec for the backend sidecar.
 - `src-tauri/tauri.conf.json` — Tauri bundling and sidecar resource configuration.
-- `.github/workflows/build-installers.yml` — Cross-platform installer workflow.
+- `.github/workflows/release.yml` — Cross-platform installer workflow.
 - `docs/architecture.md` — Architecture overview for the desktop shell and sidecar model.
 
 ## Prerequisites
@@ -98,7 +98,16 @@ Build the desktop installer:
 pwsh scripts/build-tauri.ps1
 ```
 
-Artifacts are written to `src-tauri/target/release/bundle/`.
+Artifacts are written to `src-tauri/target/release/bundle/` (`msi/` and `nsis/`).
+
+> If PowerShell 7 (`pwsh`) is not installed, use the cross-platform npm wrappers
+> instead — they run the same scripts via `scripts/run-ps.mjs`, falling back to
+> Windows PowerShell automatically:
+>
+> ```powershell
+> npm run build:backend     # backend sidecar
+> npm run build:installer   # desktop installer
+> ```
 
 ## Building on macOS
 
@@ -134,7 +143,7 @@ Expected installer artifacts: `.deb` and `.AppImage`
 
 ## CI/CD
 
-The cross-platform workflow lives in `.github/workflows/build-installers.yml`.
+The cross-platform workflow lives in `.github/workflows/release.yml`.
 
 - Runs on tag pushes matching `v*`
 - Supports manual execution through `workflow_dispatch`
@@ -157,9 +166,9 @@ The cross-platform workflow lives in `.github/workflows/build-installers.yml`.
 
 ### Backend sidecar is not bundled
 
-- Confirm the sidecar was staged into `src-tauri/binaries/`.
-- Confirm `src-tauri/tauri.conf.json` includes `binaries/lumina-backend-*/**` in `bundle.resources`.
-- Confirm the shell plugin sidecar command remains `binaries/lumina-backend`.
+- Confirm the PyInstaller output was staged into `src-tauri/sidecar/lumina-backend/`.
+- Confirm `src-tauri/tauri.conf.json` maps `"sidecar/lumina-backend": "lumina-backend"` under `bundle.resources`.
+- Confirm the shell resolves it from the resource directory as `lumina-backend/lumina-backend.exe` (see `src-tauri/src/main.rs`).
 
 ### Windows build script cannot find Python
 
