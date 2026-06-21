@@ -8,7 +8,13 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from app.services.export_service import export_dataframe_csv, export_dataframe_excel, export_inference_results, generate_summary_report
+from app.services.export_service import (
+    export_dataframe_csv,
+    export_dataframe_excel,
+    export_inference_results,
+    generate_html_report,
+    generate_summary_report,
+)
 from app.services.profiling import profile_dataset
 from app.session import DatasetSession, store
 
@@ -67,19 +73,29 @@ async def export_excel(dataset_id: str):
 
 
 @router.get("/{dataset_id}/report")
-async def export_report(dataset_id: str):
-    """Generate a Markdown analysis report from the current session state."""
+async def export_report(dataset_id: str, fmt: Literal["markdown", "html"] = "markdown"):
+    """Generate an analysis report (Markdown or printable HTML) from session state."""
 
     session = _get_session(dataset_id)
     profile_data = profile_dataset(dataset_id, session.active_dataframe).model_dump()
     session.profile_snapshot = profile_data
 
-    report_md = generate_summary_report(
-        profile_data=profile_data,
-        chart_configs=list(session.chart_configs),
-        inference_results=list(session.inference_results),
-        regression_summary=_build_regression_summary(session),
-    )
+    report_args = {
+        "profile_data": profile_data,
+        "chart_configs": list(session.chart_configs),
+        "inference_results": list(session.inference_results),
+        "regression_summary": _build_regression_summary(session),
+    }
+
+    if fmt == "html":
+        report_html = generate_html_report(**report_args)
+        return Response(
+            content=report_html.encode("utf-8"),
+            media_type="text/html",
+            headers={"Content-Disposition": 'attachment; filename="lumina-report.html"'},
+        )
+
+    report_md = generate_summary_report(**report_args)
     return Response(
         content=report_md.encode("utf-8"),
         media_type="text/markdown",

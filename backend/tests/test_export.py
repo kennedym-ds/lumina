@@ -60,6 +60,43 @@ def test_export_dataframe_excel_returns_xlsx_bytes():
     assert output.startswith(b"PK\x03\x04")
 
 
+def test_csv_export_neutralizes_formula_injection():
+    """Cells/headers starting with a formula trigger are prefixed with a quote."""
+
+    df = pd.DataFrame(
+        {
+            "=name": ["=1+1", "+2", "@cmd", "-3", "safe"],
+            "value": [1, 2, 3, 4, 5],
+        }
+    )
+
+    lines = export_dataframe_csv(df).decode("utf-8").splitlines()
+
+    # Header and every formula-trigger string cell are escaped; numbers untouched.
+    assert lines[0] == "'=name,value"
+    assert lines[1].startswith("'=1+1")
+    assert lines[2].startswith("'+2")
+    assert lines[3].startswith("'@cmd")
+    assert lines[4].startswith("'-3")
+    assert lines[5] == "safe,5"
+
+
+def test_generate_html_report_is_self_contained_and_escaped():
+    from app.services.export_service import generate_html_report
+
+    html = generate_html_report(
+        profile_data={"row_count": 5, "column_count": 2, "columns": []},
+        chart_configs=[],
+        inference_results=[{"kind": "t-test <x>", "statistic": 1.0}],
+        regression_summary=None,
+    )
+
+    assert html.startswith("<!DOCTYPE html>")
+    assert "<style>" in html and "</html>" in html  # self-contained, no external assets
+    assert "<h1>" in html  # report title rendered as a heading
+    assert "<x>" not in html  # angle brackets in content are escaped, not raw markup
+
+
 def test_generate_summary_report_includes_expected_sections():
     report = generate_summary_report(
         profile_data={"row_count": 12, "column_count": 4, "duplicate_row_count": 1},

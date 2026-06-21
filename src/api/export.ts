@@ -1,17 +1,19 @@
 import { getAuthToken, getBackendPort } from "@/api/client";
 
-export type ExportFormat = "csv" | "excel" | "report";
+export type ExportFormat = "csv" | "excel" | "report" | "html-report";
 
 const endpointMap: Record<ExportFormat, string> = {
   csv: "csv",
   excel: "excel",
   report: "report",
+  "html-report": "report?fmt=html",
 };
 
 const extensionMap: Record<ExportFormat, string> = {
   csv: "csv",
   excel: "xlsx",
   report: "md",
+  "html-report": "html",
 };
 
 function getBaseUrl(): string {

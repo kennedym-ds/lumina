@@ -65,7 +65,16 @@ export function ExportMenu() {
             }}
             className="block w-full rounded px-2 py-1 text-left text-sm text-slate-700 hover:bg-slate-50"
           >
-            Export Report
+            Export Report (MD)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void handleExport("html-report");
+            }}
+            className="block w-full rounded px-2 py-1 text-left text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Export Report (HTML)
           </button>
         </div>
       ) : null}
