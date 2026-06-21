@@ -8,4 +8,7 @@ scikit-learn>=1.6.0
 openpyxl>=3.1.5
 python-multipart>=0.0.9
 plotly>=5.24.1
-kaleido>=0.2.1
+# Pin to the self-contained 0.2.x line. kaleido 1.x is a Chromium/choreographer
+# rewrite whose kaleido.mocker runs argparse at import time, which breaks
+# PyInstaller's collect_submodules during the sidecar build.
+kaleido==0.2.1

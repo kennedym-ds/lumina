@@ -34,6 +34,33 @@ function Write-Warn {
     Write-Host "[WARN] $Message" -ForegroundColor Yellow
 }
 
+function Initialize-BuildPath {
+    # Two PATH hazards on Windows break `tauri build`:
+    #   1. npm bin-shims (e.g. node_modules\.bin\tauri.cmd) fall back to invoking a
+    #      bare `node`, which npm's script shell cannot always resolve.
+    #   2. A malformed PATH entry containing a stray double-quote breaks Rust's
+    #      program lookup, so `cargo metadata` reports "program not found".
+    # Strip quote-bearing entries and guarantee node + cargo dirs are present.
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCommand) {
+        throw "node was not found on PATH. Install Node.js or add it to PATH."
+    }
+    $nodeDir = Split-Path -Parent $nodeCommand.Source
+
+    $cargoCommand = Get-Command cargo -ErrorAction SilentlyContinue
+    $cargoDir = if ($cargoCommand) {
+        Split-Path -Parent $cargoCommand.Source
+    }
+    else {
+        Join-Path $env:USERPROFILE ".cargo\bin"
+    }
+
+    $existing = $env:PATH -split ';' | Where-Object { $_ -and ($_ -notmatch '"') }
+    $env:PATH = (@($nodeDir, $cargoDir) + $existing | Select-Object -Unique) -join ';'
+
+    Write-Info "Build PATH prepared (node: $nodeDir; cargo: $cargoDir)"
+}
+
 if (-not $SkipBackend) {
     if (-not (Test-Path -LiteralPath $buildBackendScript)) {
         throw "Backend build script not found: $buildBackendScript"
@@ -54,16 +81,25 @@ Write-Ok "Verified sidecar executable: $sidecarExe"
 
 Push-Location $repoRoot
 try {
+    Initialize-BuildPath
+
     Write-Info "Installing frontend dependencies"
     & npm install
     if ($LASTEXITCODE -ne 0) {
         throw "npm install failed with exit code $LASTEXITCODE"
     }
 
+    $tauriCli = Join-Path $repoRoot "node_modules\@tauri-apps\cli\tauri.js"
+    if (-not (Test-Path -LiteralPath $tauriCli)) {
+        throw "Tauri CLI not found: $tauriCli. Did 'npm install' succeed?"
+    }
+
+    # Invoke the Tauri CLI through node directly rather than `npm run tauri`, whose
+    # cmd bin-shim cannot reliably resolve node in npm's script shell on Windows.
     Write-Info "Running Tauri production build"
-    & npm run tauri build
+    & node $tauriCli build
     if ($LASTEXITCODE -ne 0) {
-        throw "npm run tauri build failed with exit code $LASTEXITCODE"
+        throw "tauri build failed with exit code $LASTEXITCODE"
     }
 }
 finally {
