@@ -80,22 +80,25 @@ async def export_report(dataset_id: str, fmt: Literal["markdown", "html"] = "mar
     profile_data = profile_dataset(dataset_id, session.active_dataframe).model_dump()
     session.profile_snapshot = profile_data
 
-    report_args = {
-        "profile_data": profile_data,
-        "chart_configs": list(session.chart_configs),
-        "inference_results": list(session.inference_results),
-        "regression_summary": _build_regression_summary(session),
-    }
-
     if fmt == "html":
-        report_html = generate_html_report(**report_args)
+        report_html = generate_html_report(
+            profile_data=profile_data,
+            chart_configs=list(session.chart_configs),
+            inference_results=list(session.inference_results),
+            regression_summary=_build_regression_summary(session),
+        )
         return Response(
             content=report_html.encode("utf-8"),
             media_type="text/html",
             headers={"Content-Disposition": 'attachment; filename="lumina-report.html"'},
         )
 
-    report_md = generate_summary_report(**report_args)
+    report_md = generate_summary_report(
+        profile_data=profile_data,
+        chart_configs=list(session.chart_configs),
+        inference_results=list(session.inference_results),
+        regression_summary=_build_regression_summary(session),
+    )
     return Response(
         content=report_md.encode("utf-8"),
         media_type="text/markdown",

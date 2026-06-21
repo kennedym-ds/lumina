@@ -83,7 +83,7 @@ def apply_missing_strategy(
             continue
 
         if pd.api.types.is_numeric_dtype(series):
-            fill_value = float(series.mean())
+            fill_value: Any = float(series.mean())
             working[col] = series.fillna(fill_value)
             warnings.append(f"Imputed mean for column '{col}'")
         else:

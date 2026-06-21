@@ -12,6 +12,7 @@ from app.models.eda import (
     DistributionResponse,
     DownsampleRequest,
     DownsampleResponse,
+    KDETrace,
 )
 from app.models.profiling import CorrelationRequest, CorrelationResponse, DatasetProfile
 from app.services.chart_builder import build_chart_figure
@@ -126,7 +127,11 @@ async def get_distribution(dataset_id: str, request: DistributionRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return DistributionResponse(column=request.column, group_by=request.group_by, traces=traces)
+    return DistributionResponse(
+        column=request.column,
+        group_by=request.group_by,
+        traces=[KDETrace(**trace) for trace in traces],
+    )
 
 
 def _json_safe(value):
