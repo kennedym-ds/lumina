@@ -118,18 +118,24 @@ export function ProfilerPanel({ datasetId, dependent }: ProfilerPanelProps) {
   const [data, setData] = useState<ProfilerResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Sequence number of the most recent request; responses from older requests are
+  // ignored so debounced slider/class changes can't resolve out of order and snap
+  // the UI back to stale profiler data.
+  const latestRequestIdRef = useRef(0);
 
   const runProfiler = async (
     nextValues: Record<string, number | string>,
     nextTarget: string | null,
     adoptValues = false,
   ) => {
+    const requestId = ++latestRequestIdRef.current;
     try {
       const response = await profilerMutation.mutateAsync({
         values: nextValues,
         target_class: nextTarget,
         grid_points: GRID_POINTS,
       });
+      if (requestId !== latestRequestIdRef.current) return;
       setData(response);
       setTargetClass(response.target_class);
       // Only adopt server-resolved factor settings on first load. For slider-driven
@@ -140,6 +146,7 @@ export function ProfilerPanel({ datasetId, dependent }: ProfilerPanelProps) {
       }
       setErrorMessage(null);
     } catch (error) {
+      if (requestId !== latestRequestIdRef.current) return;
       setErrorMessage(getErrorMessage(error));
     }
   };

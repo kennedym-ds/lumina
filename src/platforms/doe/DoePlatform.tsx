@@ -13,11 +13,23 @@ function getErrorMessage(error: unknown): string {
   return "Something went wrong. Please check your inputs and try again.";
 }
 
+// Leading characters a spreadsheet may interpret as a formula (CSV injection, CWE-1236).
+const FORMULA_TRIGGERS = ["=", "+", "-", "@", "\t", "\r"];
+
+// Quote/escape a CSV cell and neutralise formula triggers so user-controlled factor
+// names can't break CSV structure or execute when opened in Excel/Sheets.
+function csvCell(value: string): string {
+  const neutralised = FORMULA_TRIGGERS.some((t) => value.startsWith(t)) ? `'${value}` : value;
+  return `"${neutralised.replace(/"/g, '""')}"`;
+}
+
 function downloadCsv(result: DesignResponse): void {
   const { factor_names, runs } = result;
-  const header = factor_names.join(",");
-  const rows = runs.map((run) => factor_names.map((name) => String(run[name] ?? "")).join(","));
-  const csv = [header, ...rows].join("\n");
+  const header = factor_names.map(csvCell).join(",");
+  const rows = runs.map((run) =>
+    factor_names.map((name) => csvCell(String(run[name] ?? ""))).join(","),
+  );
+  const csv = [header, ...rows].join("\r\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

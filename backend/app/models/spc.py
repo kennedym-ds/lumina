@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -9,7 +11,8 @@ class ControlChartRequest(BaseModel):
     """Request for a control chart over one numeric column."""
 
     column: str
-    subgroup_size: int = Field(default=1, ge=1, le=25)
+    # Control-chart constants are only defined through subgroup size 10.
+    subgroup_size: int = Field(default=1, ge=1, le=10)
 
 
 class ControlChartSeries(BaseModel):
@@ -33,7 +36,7 @@ class ControlChartViolation(BaseModel):
 class ControlChartResponse(BaseModel):
     """Control chart payload: primary + secondary series and rule violations."""
 
-    chart_kind: str  # "imr" | "xbar_r" | "xbar_s"
+    chart_kind: Literal["imr", "xbar_r", "xbar_s"]
     column: str
     subgroup_size: int
     primary: ControlChartSeries
@@ -49,7 +52,8 @@ class CapabilityRequest(BaseModel):
     lsl: float | None = None
     usl: float | None = None
     target: float | None = None
-    subgroup_size: int = Field(default=1, ge=1, le=25)
+    # Control-chart constants are only defined through subgroup size 10.
+    subgroup_size: int = Field(default=1, ge=1, le=10)
 
 
 class CapabilityHistogram(BaseModel):

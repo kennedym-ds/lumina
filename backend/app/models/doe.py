@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,7 @@ class DesignRequest(BaseModel):
     """Request for generating a DOE design matrix."""
 
     factors: list[Factor]
-    design_type: str  # "full_factorial" | "fractional_factorial" | "plackett_burman"
+    design_type: Literal["full_factorial", "fractional_factorial", "plackett_burman"]
     levels: int = Field(default=2, ge=2)
     fraction: int = Field(default=1, ge=1)  # exponent p in 2^(k-p)
     n_center: int = Field(default=0, ge=0)

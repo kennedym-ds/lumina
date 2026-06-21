@@ -50,9 +50,13 @@ export function MultivariatePlatform() {
   }
 
   const toggleColumn = (name: string) => {
-    setSelectedColumns((prev) =>
-      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
-    );
+    setSelectedColumns((prev) => {
+      // An empty selection means "all numeric columns" (see `activeColumns`), and the
+      // checkboxes render as checked in that state. Expand it to the explicit list
+      // before toggling so unchecking a box removes that column instead of adding it.
+      const current = prev.length > 0 ? prev : numericColumns;
+      return current.includes(name) ? current.filter((c) => c !== name) : [...current, name];
+    });
   };
 
   const runPca = () => {
@@ -275,7 +279,7 @@ export function MultivariatePlatform() {
             {/* Scatter colored by cluster */}
             <div className="rounded border border-slate-200 p-2">
               <Plot
-                data={Array.from({ length: nClusters }, (_, k) => {
+                data={Array.from({ length: clusterResult.cluster_sizes.length }, (_, k) => {
                   const mask = clusterResult.labels.map((label) => label === k);
                   return {
                     x: clusterResult.x.filter((_, i) => mask[i]),

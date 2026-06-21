@@ -237,6 +237,9 @@ def fit_curve(
     n_params = len(param_names)
 
     # --- select, coerce, clean ---
+    for col in (x_column, y_column):
+        if col not in df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame.")
     subset = df[[x_column, y_column]].apply(pd.to_numeric, errors="coerce").dropna()
     subset = subset.sort_values(x_column)
 
