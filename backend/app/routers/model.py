@@ -24,6 +24,8 @@ from app.models.regression import (
     ModelComparisonResponse,
     PredictionRequest,
     PredictionResponse,
+    ProfilerRequest,
+    ProfilerResponse,
     RegressionRequest,
     RegressionResponse,
     RocResponse,
@@ -41,6 +43,7 @@ from app.services.evaluation import (
 )
 from app.services.missing_values import check_missing_values
 from app.services.regression import (
+    compute_profiler,
     compute_vif,
     fit_decision_tree,
     fit_decision_tree_classifier,
@@ -346,6 +349,32 @@ async def predict(dataset_id: str, request: PredictionRequest):
         raise HTTPException(status_code=422, detail=translate_error(exc)) from exc
 
     return PredictionResponse(**result)
+
+
+@router.post("/{dataset_id}/profiler", response_model=ProfilerResponse)
+async def profiler(dataset_id: str, request: ProfilerRequest):
+    """Compute prediction-profiler traces for the latest fitted model."""
+
+    session = _get_session(dataset_id)
+
+    if session.fitted_model is None:
+        raise HTTPException(status_code=400, detail="No fitted model available")
+
+    try:
+        result = compute_profiler(
+            session,
+            request.values,
+            request.grid_points,
+            request.target_class,
+        )
+    except HTTPException as exc:
+        raise exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=translate_error(exc)) from exc
+
+    return ProfilerResponse(**result)
 
 
 @router.get("/{dataset_id}/extended-diagnostics", response_model=ExtendedDiagnosticsResponse)

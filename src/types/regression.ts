@@ -81,6 +81,33 @@ export interface PredictionResponse {
   probabilities: Record<string, number> | null;
 }
 
+export interface ProfilerRequest {
+  values?: Record<string, number | string>;
+  grid_points?: number;
+  target_class?: string | null;
+}
+
+export interface ProfileTrace {
+  feature: string;
+  is_numeric: boolean;
+  current: number | string;
+  grid_x: (number | string)[];
+  grid_y: number[];
+  min: number | null;
+  max: number | null;
+  categories: string[] | null;
+}
+
+export interface ProfilerResponse {
+  dependent: string;
+  predicted_value: number;
+  response_kind: "value" | "probability";
+  class_labels: string[] | null;
+  target_class: string | null;
+  current_values: Record<string, number | string>;
+  profiles: ProfileTrace[];
+}
+
 export interface FeatureImportanceEntry {
   feature: string;
   importance: number;

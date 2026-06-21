@@ -131,6 +131,39 @@ class PredictionResponse(BaseModel):
     probabilities: dict[str, float] | None = None
 
 
+class ProfilerRequest(BaseModel):
+    """Payload for a prediction-profiler computation."""
+
+    values: dict[str, float | int | str] | None = None
+    grid_points: int = Field(default=25, ge=2, le=100)
+    target_class: str | None = None
+
+
+class ProfileTrace(BaseModel):
+    """Response curve for one factor swept across its range."""
+
+    feature: str
+    is_numeric: bool
+    current: float | str
+    grid_x: list[float | str]
+    grid_y: list[float]
+    min: float | None = None
+    max: float | None = None
+    categories: list[str] | None = None
+
+
+class ProfilerResponse(BaseModel):
+    """Prediction-profiler traces plus the current-point prediction."""
+
+    dependent: str
+    predicted_value: float
+    response_kind: str  # "value" | "probability"
+    class_labels: list[str] | None = None
+    target_class: str | None = None
+    current_values: dict[str, float | str]
+    profiles: list[ProfileTrace]
+
+
 class ExtendedDiagnosticsResponse(BaseModel):
     """Feature importance, coefficient path, and partial dependence payloads."""
 
