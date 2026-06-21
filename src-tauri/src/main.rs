@@ -58,7 +58,12 @@ fn main() {
                     .join("lumina-backend.exe");
 
                 let mut command = std::process::Command::new(&backend_exe);
-                command.args(["--port", &port.to_string(), "--token", &token]);
+                command.args(["--port", &port.to_string()]);
+                // Pass the bearer token via an environment variable, not a CLI arg:
+                // on Windows another local process can read a process's command line
+                // (e.g. via WMI), which would leak the session token. Env vars of
+                // another process are not readable by non-elevated peers.
+                command.env("LUMINA_AUTH_TOKEN", &token);
 
                 // Suppress the console window the console-subsystem backend would
                 // otherwise flash on Windows.

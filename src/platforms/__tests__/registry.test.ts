@@ -9,6 +9,10 @@ describe("platform registry", () => {
       "distribution",
       "inference",
       "regression",
+      "spc",
+      "multivariate",
+      "doe",
+      "curvefit",
       "dashboard",
     ]);
   });

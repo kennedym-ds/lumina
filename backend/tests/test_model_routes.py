@@ -1657,3 +1657,86 @@ def test_ols_supports_categorical_predictors(client):
     assert any(name.startswith("group_") for name in coefficients)
     assert "x" in coefficients
     assert any("one-hot encoded" in warning for warning in payload.get("warnings", []))
+
+
+def test_profiler_requires_fitted_model(client, regression_csv_bytes):
+    dataset_id = _upload_csv(client, regression_csv_bytes)
+
+    response = client.post(f"/api/model/{dataset_id}/profiler", json={})
+
+    assert response.status_code == 400
+
+
+def test_profiler_ols_defaults(client, regression_csv_bytes):
+    """Profiler returns one trace per factor with the current-point prediction."""
+
+    dataset_id = _upload_csv(client, regression_csv_bytes)
+    fit = _fit_regression(
+        client,
+        dataset_id,
+        {"model_type": "ols", "dependent": "y", "independents": ["x1", "x2"]},
+    )
+    assert fit.status_code == 200
+
+    response = client.post(f"/api/model/{dataset_id}/profiler", json={"grid_points": 15})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["response_kind"] == "value"
+    assert body["dependent"] == "y"
+    assert set(body["current_values"].keys()) == {"x1", "x2"}
+    assert isinstance(body["predicted_value"], float)
+
+    profiles = {trace["feature"]: trace for trace in body["profiles"]}
+    assert set(profiles.keys()) == {"x1", "x2"}
+    for trace in profiles.values():
+        assert trace["is_numeric"] is True
+        assert len(trace["grid_x"]) == 15
+        assert len(trace["grid_y"]) == 15
+
+
+def test_profiler_reflects_supplied_values(client, regression_csv_bytes):
+    """Supplied factor settings drive the current-point prediction."""
+
+    dataset_id = _upload_csv(client, regression_csv_bytes)
+    _fit_regression(
+        client,
+        dataset_id,
+        {"model_type": "ols", "dependent": "y", "independents": ["x1", "x2"]},
+    )
+
+    low = client.post(
+        f"/api/model/{dataset_id}/profiler",
+        json={"values": {"x1": 0.0, "x2": 0.0}},
+    ).json()
+    high = client.post(
+        f"/api/model/{dataset_id}/profiler",
+        json={"values": {"x1": 5.0, "x2": 5.0}},
+    ).json()
+
+    assert low["current_values"]["x1"] == 0.0
+    assert high["current_values"]["x1"] == 5.0
+    assert low["predicted_value"] != high["predicted_value"]
+
+
+def test_profiler_classifier_probability(client, logistic_csv_bytes):
+    """Classifier profiling returns probability traces and class labels."""
+
+    dataset_id = _upload_csv(client, logistic_csv_bytes)
+    fit = _fit_regression(
+        client,
+        dataset_id,
+        {"model_type": "logistic", "dependent": "target", "independents": ["x1", "x2"]},
+    )
+    assert fit.status_code == 200
+
+    response = client.post(f"/api/model/{dataset_id}/profiler", json={})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["response_kind"] == "probability"
+    assert body["class_labels"]
+    assert body["target_class"] in body["class_labels"]
+    assert 0.0 <= body["predicted_value"] <= 1.0
+    for trace in body["profiles"]:
+        assert all(0.0 <= value <= 1.0 for value in trace["grid_y"])

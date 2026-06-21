@@ -116,6 +116,10 @@ vi.mock("@/platforms/regression/PredictionPanel", () => ({
   PredictionPanel: () => <div>Prediction Panel</div>,
 }));
 
+vi.mock("@/platforms/regression/ProfilerPanel", () => ({
+  ProfilerPanel: () => <div>Profiler Panel</div>,
+}));
+
 vi.mock("@/platforms/regression/ExtendedDiagnostics", () => ({
   ExtendedDiagnostics: () => <div>Extended Diagnostics</div>,
 }));

@@ -1445,6 +1445,211 @@ def predict_new_observation(
     }
 
 
+def _prepare_prediction_matrix_batch(
+    frame: pd.DataFrame,
+    independents: list[str],
+    poly_degree: int,
+    feature_names: list[str] | None,
+    label_encoders: EncodingMetadata | None,
+    interaction_terms: list[list[str]] | None = None,
+) -> pd.DataFrame:
+    """Build a model design matrix for a multi-row prediction frame.
+
+    Batch counterpart to ``_prepare_prediction_matrix`` — reuses the same
+    encoding/interaction/polynomial pipeline but operates on many rows at once,
+    which the profiler relies on to sweep a factor across its range cheaply.
+    """
+
+    missing_columns = [column for column in independents if column not in frame.columns]
+    if missing_columns:
+        raise ValueError(f"Missing prediction values for: {', '.join(missing_columns)}")
+
+    warnings: list[str] = []
+    ordered = frame.loc[:, independents].reset_index(drop=True)
+    encoded, _ = _encode_features(ordered, independents, warnings, label_encoders)
+    encoded = _apply_interaction_terms(encoded, warnings, interaction_terms)
+    X_model, derived_feature_names = _apply_polynomial_features(encoded, warnings, poly_degree)
+    expected_feature_names = feature_names or derived_feature_names
+    return X_model.reindex(columns=expected_feature_names, fill_value=0.0)
+
+
+def _profiler_class_labels(session: Any) -> list[str] | None:
+    """Resolve the ordered class labels for a fitted classifier, if any."""
+
+    classes = getattr(session.fitted_model, "classes_", None)
+    if classes is not None:
+        return [str(label) for label in classes]
+
+    labels = session.model_predictions.get("labels")
+    if isinstance(labels, list) and labels:
+        return [str(label) for label in labels]
+
+    return None
+
+
+def _predict_response_batch(
+    session: Any,
+    frame: pd.DataFrame,
+    target_class: str | None = None,
+) -> np.ndarray:
+    """Predict the profiled response for every row of *frame*.
+
+    Returns the numeric prediction for regression models, or the probability of
+    *target_class* (defaulting to the last class) for classifiers — mirroring the
+    per-model-type branching in ``predict_new_observation``.
+    """
+
+    config = session.model_config_dict
+    model_type = str(config.get("model_type", ""))
+    independents = [str(column) for column in config.get("independents", [])]
+    poly_degree = int(config.get("polynomial_degree", 1) or 1)
+    interaction_terms = config.get("interaction_terms")
+    model = session.fitted_model
+
+    X_model = _prepare_prediction_matrix_batch(
+        frame,
+        independents,
+        poly_degree,
+        session.feature_names,
+        session.label_encoders,
+        interaction_terms,
+    )
+
+    if model_type == "ols":
+        X_input = sm.add_constant(X_model, has_constant="add")
+        return np.asarray(model.predict(X_input)).ravel().astype(float)
+
+    if model_type == "logistic":
+        X_input = sm.add_constant(X_model, has_constant="add")
+        positive_probability = np.asarray(model.predict(X_input)).ravel().astype(float)
+        labels = session.model_predictions.get("labels", ["0", "1"])
+        if target_class is not None and str(target_class) == str(labels[0]):
+            return 1.0 - positive_probability
+        return positive_probability
+
+    if model_type in CLASSIFIER_TYPES and hasattr(model, "predict_proba"):
+        probabilities = np.asarray(model.predict_proba(X_model))
+        class_labels = [str(label) for label in getattr(model, "classes_", [])]
+        if target_class is not None and str(target_class) in class_labels:
+            index = class_labels.index(str(target_class))
+        else:
+            index = probabilities.shape[1] - 1
+        return probabilities[:, index].astype(float)
+
+    return np.asarray(model.predict(X_model)).ravel().astype(float)
+
+
+def compute_profiler(
+    session: Any,
+    values: dict[str, float | int | str] | None = None,
+    grid_points: int = 25,
+    target_class: str | None = None,
+) -> dict[str, Any]:
+    """Compute JMP-style prediction-profiler traces for the latest fitted model.
+
+    For each factor, sweeps it across its observed range (numeric) or category set
+    (categorical) while holding the other factors at *values* (defaulting to the
+    training mean/mode), and returns the resulting response curve plus the
+    prediction at the current point.
+    """
+
+    config = session.model_config_dict
+    model_type = str(config.get("model_type", ""))
+    independents = [str(column) for column in config.get("independents", [])]
+
+    if session.fitted_model is None:
+        raise ValueError("No fitted model available")
+    if not independents:
+        raise ValueError("Model has no independent variables to profile")
+
+    df = session.active_dataframe
+    grid_points = max(2, min(int(grid_points or 25), 100))
+
+    is_numeric: dict[str, bool] = {}
+    feature_categories: dict[str, list[str]] = {}
+    feature_range: dict[str, tuple[float, float]] = {}
+    for column in independents:
+        if column not in df.columns:
+            raise ValueError(f"Column '{column}' is not present in the active dataset")
+        series = df[column].dropna()
+        if pd.api.types.is_numeric_dtype(series):
+            is_numeric[column] = True
+            low = float(series.min()) if not series.empty else 0.0
+            high = float(series.max()) if not series.empty else 1.0
+            if low == high:
+                high = low + 1.0
+            feature_range[column] = (low, high)
+        else:
+            is_numeric[column] = False
+            categories = [str(value) for value in pd.Series(series.unique()).tolist()][:20]
+            if not categories:
+                raise ValueError(f"Column '{column}' has no usable values to profile")
+            feature_categories[column] = categories
+
+    provided = values or {}
+    current: dict[str, float | str] = {}
+    for column in independents:
+        raw = provided.get(column)
+        if raw is not None and str(raw) != "":
+            current[column] = float(raw) if is_numeric[column] else str(raw)
+        elif is_numeric[column]:
+            series = df[column].dropna()
+            current[column] = float(series.mean()) if not series.empty else 0.0
+        else:
+            mode = df[column].dropna().mode()
+            current[column] = str(mode.iloc[0]) if not mode.empty else feature_categories[column][0]
+
+    response_kind = "value"
+    class_labels: list[str] | None = None
+    resolved_target: str | None = None
+    if model_type in CLASSIFIER_TYPES:
+        response_kind = "probability"
+        class_labels = _profiler_class_labels(session)
+        if class_labels:
+            resolved_target = (
+                str(target_class) if target_class is not None and str(target_class) in class_labels else class_labels[-1]
+            )
+
+    base_row = {column: current[column] for column in independents}
+    current_frame = pd.DataFrame([base_row], columns=independents)
+    predicted_value = float(_predict_response_batch(session, current_frame, resolved_target)[0])
+
+    profiles: list[dict[str, Any]] = []
+    for column in independents:
+        if is_numeric[column]:
+            low, high = feature_range[column]
+            grid_x: list[Any] = [float(value) for value in np.linspace(low, high, grid_points)]
+        else:
+            grid_x = list(feature_categories[column])
+
+        frame = pd.DataFrame([dict(base_row) for _ in grid_x], columns=independents)
+        frame[column] = grid_x
+        grid_y = [float(value) for value in _predict_response_batch(session, frame, resolved_target)]
+
+        profiles.append(
+            {
+                "feature": column,
+                "is_numeric": is_numeric[column],
+                "current": current[column],
+                "grid_x": grid_x,
+                "grid_y": grid_y,
+                "min": feature_range[column][0] if is_numeric[column] else None,
+                "max": feature_range[column][1] if is_numeric[column] else None,
+                "categories": None if is_numeric[column] else feature_categories[column],
+            }
+        )
+
+    return {
+        "dependent": str(config.get("dependent", "")),
+        "predicted_value": predicted_value,
+        "response_kind": response_kind,
+        "class_labels": class_labels,
+        "target_class": resolved_target,
+        "current_values": current,
+        "profiles": profiles,
+    }
+
+
 def run_stepwise_selection(
     df: pd.DataFrame,
     dependent: str,

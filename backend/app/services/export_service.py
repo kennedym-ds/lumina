@@ -2,16 +2,44 @@
 
 from __future__ import annotations
 
+import html as html_lib
 import io
 from datetime import datetime
+from typing import Any
 
 import pandas as pd
+
+# Leading characters a spreadsheet (Excel, Sheets, LibreOffice) may interpret as a
+# formula. A malicious dataset cell like ``=HYPERLINK(...)`` or ``=cmd|...`` would
+# execute when the exported file is opened, so we neutralise them on export.
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _escape_formula_value(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(_FORMULA_TRIGGERS):
+        return "'" + value
+    return value
+
+
+def _sanitize_for_spreadsheet(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy with formula-triggering string cells and headers escaped.
+
+    Numeric/datetime cells cannot carry formulas, so only text-bearing columns and
+    the column headers are touched. This is CSV/formula-injection (CWE-1236) defence.
+    """
+
+    safe = df.copy()
+    for column in safe.columns:
+        if safe[column].dtype == object or pd.api.types.is_string_dtype(safe[column]):
+            safe[column] = safe[column].map(_escape_formula_value)
+    safe.columns = pd.Index([_escape_formula_value(str(column)) for column in safe.columns])
+    return safe
 
 
 def export_dataframe_csv(df: pd.DataFrame) -> bytes:
     """Export a DataFrame as UTF-8 CSV bytes."""
 
-    return df.to_csv(index=False).encode("utf-8")
+    return _sanitize_for_spreadsheet(df).to_csv(index=False).encode("utf-8")
 
 
 def export_dataframe_excel(df: pd.DataFrame) -> bytes:
@@ -19,7 +47,7 @@ def export_dataframe_excel(df: pd.DataFrame) -> bytes:
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
+        _sanitize_for_spreadsheet(df).to_excel(writer, index=False)
     buffer.seek(0)
     return buffer.read()
 
@@ -133,6 +161,83 @@ def generate_summary_report(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _markdown_to_html_body(markdown: str) -> str:
+    """Convert the subset of Markdown our report emits (h1-h3, lists, paragraphs)
+    into escaped HTML. Intentionally minimal — the report generator only uses
+    these constructs, so a full Markdown parser would be overkill."""
+
+    out: list[str] = []
+    in_list = False
+
+    def close_list() -> None:
+        nonlocal in_list
+        if in_list:
+            out.append("</ul>")
+            in_list = False
+
+    for raw in markdown.split("\n"):
+        line = raw.rstrip()
+        if not line.strip():
+            close_list()
+            continue
+        if line.startswith("### "):
+            close_list()
+            out.append(f"<h3>{html_lib.escape(line[4:])}</h3>")
+        elif line.startswith("## "):
+            close_list()
+            out.append(f"<h2>{html_lib.escape(line[3:])}</h2>")
+        elif line.startswith("# "):
+            close_list()
+            out.append(f"<h1>{html_lib.escape(line[2:])}</h1>")
+        elif line.startswith("- "):
+            if not in_list:
+                out.append("<ul>")
+                in_list = True
+            out.append(f"<li>{html_lib.escape(line[2:])}</li>")
+        else:
+            close_list()
+            out.append(f"<p>{html_lib.escape(line)}</p>")
+
+    close_list()
+    return "\n".join(out)
+
+
+_REPORT_CSS = """
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #1e293b;
+         max-width: 820px; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.55; }
+  h1 { font-size: 1.6rem; border-bottom: 2px solid #6366f1; padding-bottom: .3rem; }
+  h2 { font-size: 1.2rem; margin-top: 1.8rem; color: #4338ca; }
+  h3 { font-size: 1rem; margin-top: 1.1rem; color: #334155; }
+  ul { padding-left: 1.3rem; } li { margin: .15rem 0; }
+  p { margin: .4rem 0; }
+  @media print { body { margin: 0; } }
+"""
+
+
+def generate_html_report(
+    profile_data: dict | None,
+    chart_configs: list[dict],
+    inference_results: list[dict] | None,
+    regression_summary: dict | None,
+) -> str:
+    """Produce a self-contained, printable HTML analysis report.
+
+    Reuses ``generate_summary_report`` for content so the HTML and Markdown
+    exports never drift apart. The result has no external assets, so the webview
+    can render it and the user can print/save it to PDF.
+    """
+
+    markdown = generate_summary_report(profile_data, chart_configs, inference_results, regression_summary)
+    body = _markdown_to_html_body(markdown)
+    return (
+        "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+        "<meta charset=\"utf-8\" />\n"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
+        "<title>Lumina Analysis Report</title>\n"
+        f"<style>{_REPORT_CSS}</style>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
+    )
+
+
 def export_inference_results(results: list[dict]) -> tuple[str, bytes]:
     """Export inference result history as Markdown report + CSV bytes.
 
@@ -166,7 +271,7 @@ def export_inference_results(results: list[dict]) -> tuple[str, bytes]:
         flat_rows.append(flat)
 
     buf = io.BytesIO()
-    pd.DataFrame(flat_rows).to_csv(buf, index=False)
+    _sanitize_for_spreadsheet(pd.DataFrame(flat_rows)).to_csv(buf, index=False)
     csv_bytes = buf.getvalue()
 
     return markdown, csv_bytes

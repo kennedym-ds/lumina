@@ -44,7 +44,8 @@ describe("ExportMenu", () => {
 
     expect(screen.getByRole("button", { name: /export csv/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /export excel/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /export report/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /export report \(md\)/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /export report \(html\)/i })).toBeTruthy();
   });
 
   it("downloads the requested format for the active dataset", () => {

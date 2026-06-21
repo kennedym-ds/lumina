@@ -15,6 +15,8 @@ import type {
   ModelComparisonResponse,
   PredictionRequest,
   PredictionResponse,
+  ProfilerRequest,
+  ProfilerResponse,
   RegressionRequest,
   RegressionResponse,
   RocResponse,
@@ -135,6 +137,18 @@ export function usePredict(datasetId: string | null | undefined) {
       }
 
       return apiClient.post(`/api/model/${datasetId}/predict`, payload);
+    },
+  });
+}
+
+export function useProfiler(datasetId: string | null | undefined) {
+  return useMutation<ProfilerResponse, Error, ProfilerRequest>({
+    mutationFn: (payload) => {
+      if (!datasetId) {
+        throw new Error("Dataset is required.");
+      }
+
+      return apiClient.post(`/api/model/${datasetId}/profiler`, payload);
     },
   });
 }

@@ -84,6 +84,12 @@ Write-Info "Running PyInstaller spec build"
 Push-Location $backendRoot
 try {
     & $pythonExe -m PyInstaller --noconfirm --clean $specPath
+    # PyInstaller is a native process; its non-zero exit does not trip
+    # $ErrorActionPreference. Guard it explicitly so a failed build can never
+    # fall through and stage a stale sidecar from a previous run's dist/.
+    if ($LASTEXITCODE -ne 0) {
+        throw "PyInstaller failed with exit code $LASTEXITCODE"
+    }
 }
 finally {
     Pop-Location

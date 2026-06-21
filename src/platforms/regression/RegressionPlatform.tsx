@@ -30,10 +30,11 @@ import { ExtendedDiagnostics } from "./ExtendedDiagnostics";
 import { MissingValueDialog } from "./MissingValueDialog";
 import { ModelConfigPanel } from "./ModelConfigPanel";
 import { PredictionPanel } from "./PredictionPanel";
+import { ProfilerPanel } from "./ProfilerPanel";
 import { ResultsSummary } from "./ResultsSummary";
 import { RocCurve } from "./RocCurve";
 
-type InsightTab = "prediction" | "diagnostics";
+type InsightTab = "prediction" | "profiler" | "diagnostics";
 
 const CLASSIFIER_MODEL_TYPES = new Set([
   "logistic",
@@ -605,6 +606,17 @@ export function RegressionPlatform() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setActiveInsightTab("profiler")}
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                        activeInsightTab === "profiler"
+                          ? "bg-lumina-700 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      Profiler
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveInsightTab("diagnostics")}
                       className={`rounded-md px-3 py-1.5 text-sm font-medium ${
                         activeInsightTab === "diagnostics"
@@ -621,6 +633,12 @@ export function RegressionPlatform() {
                       datasetId={datasetId}
                       independents={lastResult.independents}
                       modelType={lastResult.model_type}
+                    />
+                  ) : activeInsightTab === "profiler" ? (
+                    <ProfilerPanel
+                      key={lastResult.model_id}
+                      datasetId={datasetId}
+                      dependent={lastResult.dependent}
                     />
                   ) : (
                     <ExtendedDiagnostics datasetId={datasetId} modelType={lastResult.model_type} />

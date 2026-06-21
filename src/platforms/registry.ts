@@ -47,6 +47,40 @@ export const platforms: PlatformEntry[] = [
     ),
   },
   {
+    id: "spc",
+    label: "Quality",
+    icon: "🏭",
+    component: lazy(() =>
+      import("@/platforms/spc/QualityPlatform").then((m) => ({ default: m.QualityPlatform })),
+    ),
+  },
+  {
+    id: "multivariate",
+    label: "Multivariate",
+    icon: "🔬",
+    component: lazy(() =>
+      import("@/platforms/multivariate/MultivariatePlatform").then((m) => ({
+        default: m.MultivariatePlatform,
+      })),
+    ),
+  },
+  {
+    id: "doe",
+    label: "DOE",
+    icon: "⚗️",
+    component: lazy(() =>
+      import("@/platforms/doe/DoePlatform").then((m) => ({ default: m.DoePlatform })),
+    ),
+  },
+  {
+    id: "curvefit",
+    label: "Curve Fit",
+    icon: "🧮",
+    component: lazy(() =>
+      import("@/platforms/curvefit/CurveFitPlatform").then((m) => ({ default: m.CurveFitPlatform })),
+    ),
+  },
+  {
     id: "dashboard",
     label: "Dashboard",
     icon: "🧩",
