@@ -158,6 +158,20 @@ def test_fit_unknown_model_returns_400(client):
     assert response.status_code == 400
 
 
+def test_fit_unknown_column_returns_400(client):
+    """A column that isn't in the dataset returns a clean 400, not a 500."""
+    x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    y = [2.0, 4.0, 6.0, 8.0, 10.0]
+
+    dataset_id = _upload_curve_fit(client, x, y)
+    response = client.post(
+        f"/api/curvefit/{dataset_id}/fit",
+        json={"x_column": "x", "y_column": "missing", "model_name": "linear"},
+    )
+
+    assert response.status_code == 400
+
+
 def test_fit_missing_dataset_returns_404(client):
     """A dataset_id that doesn't exist returns 404."""
     response = client.post(

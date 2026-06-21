@@ -125,3 +125,44 @@ def test_low_gte_high_returns_400(client):
         json={"factors": factors, "design_type": "full_factorial"},
     )
     assert response.status_code == 400
+
+
+def test_duplicate_factor_names_returns_400(client):
+    """Duplicate factor names would collide in run dicts and are rejected."""
+    factors = [
+        {"name": "A", "low": 0.0, "high": 1.0},
+        {"name": "A", "low": 0.0, "high": 1.0},
+    ]
+    response = client.post(
+        "/api/doe/design",
+        json={"factors": factors, "design_type": "full_factorial"},
+    )
+    assert response.status_code == 400
+
+
+def test_unknown_design_type_returns_422(client):
+    """design_type is a Literal, so an unknown value fails validation."""
+    factors = [
+        {"name": "A", "low": 0.0, "high": 1.0},
+        {"name": "B", "low": 0.0, "high": 1.0},
+    ]
+    response = client.post(
+        "/api/doe/design",
+        json={"factors": factors, "design_type": "not_a_design"},
+    )
+    assert response.status_code == 422
+
+
+def test_fractional_resolution_accounts_for_generator_products(client):
+    """2^(6-2) with generators E=ABCD, F=ABC has a length-3 defining word (DEF),
+    so resolution is III — only correct when generator-product cancellations are
+    considered, not just individual generator words."""
+    factors = [{"name": chr(ord("A") + i), "low": 0.0, "high": 1.0} for i in range(6)]
+    response = client.post(
+        "/api/doe/design",
+        json={"factors": factors, "design_type": "fractional_factorial", "fraction": 2},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["n_runs"] == 16  # 2^(6-2)
+    assert body["resolution"] == 3

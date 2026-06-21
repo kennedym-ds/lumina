@@ -13,11 +13,30 @@ function getErrorMessage(error: unknown): string {
   return "Something went wrong. Please check your inputs and try again.";
 }
 
+// Leading characters a spreadsheet may interpret as a formula (CSV injection, CWE-1236).
+const FORMULA_TRIGGERS = ["=", "+", "-", "@", "\t", "\r"];
+
+// Escape a CSV cell: neutralise formula triggers on non-numeric strings (user-controlled
+// factor names) and quote only when needed. Numeric run values are emitted bare so
+// spreadsheets keep them numeric — e.g. negative coded levels like "-1" must not be
+// apostrophe-escaped into text.
+function csvCell(value: string): string {
+  const isNumeric = value.trim() !== "" && Number.isFinite(Number(value));
+  const needsNeutralise = !isNumeric && FORMULA_TRIGGERS.some((t) => value.startsWith(t));
+  const text = needsNeutralise ? `'${value}` : value;
+  if (needsNeutralise || /[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
 function downloadCsv(result: DesignResponse): void {
   const { factor_names, runs } = result;
-  const header = factor_names.join(",");
-  const rows = runs.map((run) => factor_names.map((name) => String(run[name] ?? "")).join(","));
-  const csv = [header, ...rows].join("\n");
+  const header = factor_names.map(csvCell).join(",");
+  const rows = runs.map((run) =>
+    factor_names.map((name) => csvCell(String(run[name] ?? ""))).join(","),
+  );
+  const csv = [header, ...rows].join("\r\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

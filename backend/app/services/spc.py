@@ -34,6 +34,46 @@ def _constants(n: int) -> dict[str, float]:
     return _CONSTANTS[min(n, 10)]
 
 
+def _c4(n: int, constants: dict[str, float]) -> float:
+    """Unbiasing constant for the subgroup standard deviation: E[s] = c4 * sigma.
+
+    Derived from the tabulated A3, since A3 := 3 / (c4 * sqrt(n)). Used by the
+    X-bar/S sigma estimate; the range-based estimate uses d2 instead.
+    """
+    return 3.0 / (constants["A3"] * np.sqrt(n))
+
+
+def _within_sigma(values: np.ndarray, subgroup_size: int, fallback: float) -> float:
+    """Estimate within-subgroup (short-term) sigma the same way the chart does.
+
+    For individuals (n<=1) this is the average moving range over d2(2). For
+    subgroups it uses the subgroup standard deviation (n>=9) or range method,
+    matching ``compute_control_chart``. Falls back to *fallback* when the spread
+    estimate is degenerate (e.g. fewer than two subgroups, or zero spread).
+    """
+
+    if subgroup_size <= 1:
+        moving_range = np.abs(np.diff(values))
+        mr_bar = float(moving_range.mean()) if moving_range.size else 0.0
+        return mr_bar / _constants(2)["d2"] if mr_bar > 0 else fallback
+
+    n_groups = values.size // subgroup_size
+    if n_groups < 2:
+        return fallback
+
+    groups = values[: n_groups * subgroup_size].reshape(n_groups, subgroup_size)
+    constants = _constants(subgroup_size)
+    if subgroup_size >= 9:
+        # X-bar/S: unbias the mean subgroup std with c4 (E[s] = c4 * sigma).
+        spread_bar = float(groups.std(axis=1, ddof=1).mean())
+        divisor = _c4(subgroup_size, constants)
+    else:
+        # X-bar/R: unbias the mean subgroup range with d2 (E[R] = d2 * sigma).
+        spread_bar = float((groups.max(axis=1) - groups.min(axis=1)).mean())
+        divisor = constants["d2"]
+    return spread_bar / divisor if spread_bar > 0 else fallback
+
+
 def _clean_numeric(df: pd.DataFrame, column: str) -> np.ndarray:
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found")
@@ -144,7 +184,8 @@ def compute_control_chart(df: pd.DataFrame, column: str, subgroup_size: int = 1)
     if use_std:
         spreads = groups.std(axis=1, ddof=1)
         spread_bar = float(spreads.mean())
-        sigma = spread_bar / (constants["d2"]) if spread_bar > 0 else 0.0
+        # X-bar/S: unbias the mean subgroup std with c4 (E[s] = c4 * sigma), not d2.
+        sigma = spread_bar / _c4(subgroup_size, constants) if spread_bar > 0 else 0.0
         xbar_ucl = xbar_bar + constants["A3"] * spread_bar
         xbar_lcl = xbar_bar - constants["A3"] * spread_bar
         spread_ucl = constants["B4"] * spread_bar
@@ -209,13 +250,13 @@ def compute_capability(
         raise ValueError("LSL must be less than USL")
 
     values = _clean_numeric(df, column)
+    subgroup_size = max(1, int(subgroup_size))
     mean = float(values.mean())
     sigma_overall = float(values.std(ddof=1))
 
-    # Within (short-term) sigma from the average moving range, matching the I-MR chart.
-    moving_range = np.abs(np.diff(values))
-    mr_bar = float(moving_range.mean()) if moving_range.size else 0.0
-    sigma_within = mr_bar / _constants(2)["d2"] if mr_bar > 0 else sigma_overall
+    # Within (short-term) sigma, estimated with the same method as the control chart
+    # so capability indices are consistent with the chart's limits.
+    sigma_within = _within_sigma(values, subgroup_size, fallback=sigma_overall)
 
     cp, cpk = _capability_pair(mean, sigma_within, lsl, usl)
     pp, ppk = _capability_pair(mean, sigma_overall, lsl, usl)

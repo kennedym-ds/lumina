@@ -81,6 +81,21 @@ def test_csv_export_neutralizes_formula_injection():
     assert lines[5] == "safe,5"
 
 
+def test_csv_export_neutralizes_formula_injection_in_categoricals():
+    """Categorical columns (ingestion converts some text columns to category) must
+    also be escaped — they can still hold formula-bearing strings."""
+
+    df = pd.DataFrame(
+        {"label": pd.Categorical(["=HYPERLINK(1)", "safe", "@cmd"])},
+    )
+
+    lines = export_dataframe_csv(df).decode("utf-8").splitlines()
+
+    assert lines[1].startswith("'=HYPERLINK(1)")
+    assert lines[2] == "safe"
+    assert lines[3].startswith("'@cmd")
+
+
 def test_generate_html_report_is_self_contained_and_escaped():
     from app.services.export_service import generate_html_report
 

@@ -30,8 +30,17 @@ def _sanitize_for_spreadsheet(df: pd.DataFrame) -> pd.DataFrame:
 
     safe = df.copy()
     for column in safe.columns:
-        if safe[column].dtype == object or pd.api.types.is_string_dtype(safe[column]):
-            safe[column] = safe[column].map(_escape_formula_value)
+        series = safe[column]
+        is_text = (
+            series.dtype == object
+            or pd.api.types.is_string_dtype(series)
+            or isinstance(series.dtype, pd.CategoricalDtype)
+        )
+        if is_text:
+            # Categoricals can hold formula-bearing strings (ingestion converts some
+            # user columns to category); operate on the object view so escaped values
+            # aren't rejected as unknown categories.
+            safe[column] = series.astype(object).map(_escape_formula_value)
     safe.columns = pd.Index([_escape_formula_value(str(column)) for column in safe.columns])
     return safe
 

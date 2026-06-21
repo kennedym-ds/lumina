@@ -181,9 +181,11 @@ export function QualityPlatform() {
               type="number"
               aria-label="Subgroup size"
               min={1}
-              max={25}
+              max={10}
               value={subgroupSize}
-              onChange={(event) => setSubgroupSize(Math.max(1, Number(event.target.value) || 1))}
+              onChange={(event) =>
+                setSubgroupSize(Math.min(10, Math.max(1, Number(event.target.value) || 1)))
+              }
               className="w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
             />
           </label>
