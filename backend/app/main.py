@@ -1,6 +1,7 @@
 """Lumina backend — FastAPI application entry point."""
 
 import argparse
+import os
 from pathlib import Path
 
 import uvicorn
@@ -9,13 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.middleware.auth import BearerTokenMiddleware
+from app.routers.curve_fit import router as curve_fit_router
 from app.routers.data import router as data_router
+from app.routers.doe import router as doe_router
 from app.routers.eda import router as eda_router
 from app.routers.export import router as export_router
 from app.routers.inference import router as inference_router
 from app.routers.model import router as model_router
 from app.routers.plugins import router as plugins_router
+from app.routers.multivariate import router as multivariate_router
 from app.routers.project import router as project_router
+from app.routers.spc import router as spc_router
 from app.routers import transforms
 from app.routers.views import router as views_router
 from app.services.plugin_loader import load_plugins
@@ -63,13 +68,17 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok", "version": "2.2.5"}
 
+    app.include_router(curve_fit_router)
     app.include_router(data_router)
+    app.include_router(doe_router)
     app.include_router(eda_router)
     app.include_router(export_router)
     app.include_router(inference_router)
     app.include_router(model_router)
     app.include_router(plugins_router)
+    app.include_router(multivariate_router)
     app.include_router(project_router)
+    app.include_router(spc_router)
     app.include_router(transforms.router)
     app.include_router(views_router)
 
@@ -83,14 +92,19 @@ def main() -> None:
     """Entry point for running the backend directly or via PyInstaller."""
     parser = argparse.ArgumentParser(description="Lumina Backend")
     parser.add_argument("--port", type=int, default=8089, help="Port to listen on")
-    parser.add_argument("--token", type=str, default="", help="Bearer token for auth")
+    parser.add_argument("--token", type=str, default="", help="Bearer token for auth (dev only; prefer LUMINA_AUTH_TOKEN)")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     parser.add_argument("--plugin-dir", type=str, default=settings.plugin_dir, help="Directory containing plugin files")
     args = parser.parse_args()
 
+    # Prefer the token from the environment — the Tauri shell passes it via
+    # LUMINA_AUTH_TOKEN so it never appears on the process command line (which other
+    # local processes can read on Windows). Fall back to --token for manual/dev runs.
+    token = os.environ.get("LUMINA_AUTH_TOKEN") or args.token
+
     # Update settings from CLI args
     settings.port = args.port
-    settings.token = args.token
+    settings.token = token
     settings.debug = args.debug
     settings.plugin_dir = args.plugin_dir
 
