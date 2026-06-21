@@ -189,12 +189,12 @@ def fractional_factorial(factors: list[dict[str, Any]], fraction: int = 1) -> di
     # those words under "multiplication", which on coded ±1 columns is the symmetric
     # difference of factor index sets (a shared factor cancels because col*col == 1).
     # Resolution is the shortest non-identity word over every combination of generators.
-    words = [set(combo) | {k_base + i} for i, combo in enumerate(gen_indices)]
+    words: list[set[int]] = [set(gen) | {k_base + i} for i, gen in enumerate(gen_indices)]
     word_lengths: list[int] = []
     for r in range(1, p + 1):
-        for combo in itertools.combinations(words, r):
+        for word_group in itertools.combinations(words, r):
             relation: set[int] = set()
-            for word in combo:
+            for word in word_group:
                 relation ^= word
             if relation:  # ignore the identity (fully cancelled) word
                 word_lengths.append(len(relation))
