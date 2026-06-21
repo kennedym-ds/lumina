@@ -34,6 +34,15 @@ def _constants(n: int) -> dict[str, float]:
     return _CONSTANTS[min(n, 10)]
 
 
+def _c4(n: int, constants: dict[str, float]) -> float:
+    """Unbiasing constant for the subgroup standard deviation: E[s] = c4 * sigma.
+
+    Derived from the tabulated A3, since A3 := 3 / (c4 * sqrt(n)). Used by the
+    X-bar/S sigma estimate; the range-based estimate uses d2 instead.
+    """
+    return 3.0 / (constants["A3"] * np.sqrt(n))
+
+
 def _within_sigma(values: np.ndarray, subgroup_size: int, fallback: float) -> float:
     """Estimate within-subgroup (short-term) sigma the same way the chart does.
 
@@ -55,11 +64,14 @@ def _within_sigma(values: np.ndarray, subgroup_size: int, fallback: float) -> fl
     groups = values[: n_groups * subgroup_size].reshape(n_groups, subgroup_size)
     constants = _constants(subgroup_size)
     if subgroup_size >= 9:
-        spreads = groups.std(axis=1, ddof=1)
+        # X-bar/S: unbias the mean subgroup std with c4 (E[s] = c4 * sigma).
+        spread_bar = float(groups.std(axis=1, ddof=1).mean())
+        divisor = _c4(subgroup_size, constants)
     else:
-        spreads = groups.max(axis=1) - groups.min(axis=1)
-    spread_bar = float(spreads.mean())
-    return spread_bar / constants["d2"] if spread_bar > 0 else fallback
+        # X-bar/R: unbias the mean subgroup range with d2 (E[R] = d2 * sigma).
+        spread_bar = float((groups.max(axis=1) - groups.min(axis=1)).mean())
+        divisor = constants["d2"]
+    return spread_bar / divisor if spread_bar > 0 else fallback
 
 
 def _clean_numeric(df: pd.DataFrame, column: str) -> np.ndarray:
@@ -172,7 +184,8 @@ def compute_control_chart(df: pd.DataFrame, column: str, subgroup_size: int = 1)
     if use_std:
         spreads = groups.std(axis=1, ddof=1)
         spread_bar = float(spreads.mean())
-        sigma = spread_bar / (constants["d2"]) if spread_bar > 0 else 0.0
+        # X-bar/S: unbias the mean subgroup std with c4 (E[s] = c4 * sigma), not d2.
+        sigma = spread_bar / _c4(subgroup_size, constants) if spread_bar > 0 else 0.0
         xbar_ucl = xbar_bar + constants["A3"] * spread_bar
         xbar_lcl = xbar_bar - constants["A3"] * spread_bar
         spread_ucl = constants["B4"] * spread_bar

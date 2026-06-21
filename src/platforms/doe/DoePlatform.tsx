@@ -16,11 +16,18 @@ function getErrorMessage(error: unknown): string {
 // Leading characters a spreadsheet may interpret as a formula (CSV injection, CWE-1236).
 const FORMULA_TRIGGERS = ["=", "+", "-", "@", "\t", "\r"];
 
-// Quote/escape a CSV cell and neutralise formula triggers so user-controlled factor
-// names can't break CSV structure or execute when opened in Excel/Sheets.
+// Escape a CSV cell: neutralise formula triggers on non-numeric strings (user-controlled
+// factor names) and quote only when needed. Numeric run values are emitted bare so
+// spreadsheets keep them numeric — e.g. negative coded levels like "-1" must not be
+// apostrophe-escaped into text.
 function csvCell(value: string): string {
-  const neutralised = FORMULA_TRIGGERS.some((t) => value.startsWith(t)) ? `'${value}` : value;
-  return `"${neutralised.replace(/"/g, '""')}"`;
+  const isNumeric = value.trim() !== "" && Number.isFinite(Number(value));
+  const needsNeutralise = !isNumeric && FORMULA_TRIGGERS.some((t) => value.startsWith(t));
+  const text = needsNeutralise ? `'${value}` : value;
+  if (needsNeutralise || /[",\r\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
 }
 
 function downloadCsv(result: DesignResponse): void {
