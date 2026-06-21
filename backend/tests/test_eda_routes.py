@@ -277,7 +277,7 @@ def test_chart_invalid_type(client, sample_csv_bytes):
 
     response = client.post(
         f"/api/eda/{dataset_id}/chart",
-        json={"chart_type": "bubble", "x": "id", "y": "value"},
+        json={"chart_type": "not_a_real_chart", "x": "id", "y": "value"},
     )
     assert response.status_code == 400
 

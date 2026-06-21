@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.session import DatasetSession, store
 from app.services.export_service import export_inference_results
 
 

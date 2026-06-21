@@ -276,7 +276,6 @@ def add_center_points(design: dict[str, Any], factors: list[dict[str, Any]], n_c
     if n_center <= 0:
         return design
 
-    factor_names = [f["name"] for f in factors]
     center_run = {f["name"]: (f["low"] + f["high"]) / 2.0 for f in factors}
 
     augmented_runs = list(design["runs"]) + [dict(center_run) for _ in range(n_center)]
