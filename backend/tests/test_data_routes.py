@@ -6,7 +6,6 @@ import sqlite3
 
 import pandas as pd
 import pyarrow.feather as feather
-import pytest
 
 
 def _upload_csv(client, csv_bytes: bytes) -> str:
