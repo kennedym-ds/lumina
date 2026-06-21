@@ -583,7 +583,7 @@ def run_normality(df: pd.DataFrame, request: NormalityRequest) -> dict[str, Any]
     values = sample.to_numpy(dtype=float)
     if len(values) <= 5000:
         shapiro_result = stats.shapiro(values)
-        shapiro_payload = {
+        shapiro_payload: dict[str, Any] = {
             "statistic": _as_float(shapiro_result.statistic),
             "p_value": _as_float(shapiro_result.pvalue),
             "reject_null": _as_float(shapiro_result.pvalue) < request.alpha,
@@ -802,7 +802,7 @@ def run_factorial_anova(
     model = smf_ols(formula, data=sub).fit()
     table = anova_lm(model, typ=2)
 
-    rows = []
+    rows: list[dict[str, Any]] = []
     for source, row in table.iterrows():
         if source == "Residual":
             continue

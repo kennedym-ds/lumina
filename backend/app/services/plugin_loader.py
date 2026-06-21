@@ -97,7 +97,7 @@ def load_plugins(plugin_dir: str | Path) -> dict[str, list[str]]:
     """Load all plugin modules from the configured plugin directory."""
 
     plugin_path = Path(plugin_dir)
-    loaded = {"charts": [], "transforms": [], "tests": []}
+    loaded: dict[str, list[str]] = {"charts": [], "transforms": [], "tests": []}
     clear_plugins()
 
     if not plugin_path.exists():

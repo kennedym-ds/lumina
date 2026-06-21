@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from numpy.linalg import LinAlgError
@@ -12,7 +14,7 @@ def _serialize_array(values: np.ndarray) -> list[float]:
     return [round(float(value), 6) for value in values]
 
 
-def _estimate_trace(group: str, values: np.ndarray, x_grid: np.ndarray) -> dict[str, object] | None:
+def _estimate_trace(group: str, values: np.ndarray, x_grid: np.ndarray) -> dict[str, Any] | None:
     if len(values) < 2:
         return None
 
@@ -33,7 +35,7 @@ def compute_kde(
     column: str,
     group_by: str | None = None,
     n_points: int = 200,
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     """Compute KDE traces for a numeric column, optionally split by a grouping column."""
 
     if column not in df.columns:

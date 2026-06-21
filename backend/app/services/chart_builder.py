@@ -251,6 +251,7 @@ def _append_trendline_traces(
 
 
 def _build_histogram(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None  # guaranteed by _validate_chart_request
     cols = [request.x] + ([request.color] if request.color else [])
     filtered = df[cols].dropna()
 
@@ -312,6 +313,7 @@ def _build_histogram(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict
 
 
 def _build_scatter(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None and request.y is not None  # guaranteed by _validate_chart_request
     cols = [request.x, request.y] + ([request.color] if request.color else [])
     filtered = df[cols].dropna()
     use_webgl = len(filtered) > WEBGL_THRESHOLD
@@ -515,6 +517,7 @@ def _build_line(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str,
 
 
 def _build_heatmap(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None and request.y is not None  # guaranteed by _validate_chart_request
     cols = [request.x, request.y] + ([request.values] if request.values else [])
     filtered = df[cols].dropna()
     aggregation = request.aggregation or "count"
@@ -522,6 +525,7 @@ def _build_heatmap(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[s
     if aggregation == "count":
         matrix = pd.crosstab(filtered[request.y], filtered[request.x])
     else:
+        assert request.values is not None  # required for sum/mean aggregation
         values = _coerce_numeric_series(filtered[request.values], request.values)
         aggregated = filtered.assign(__values=values)
         matrix = aggregated.pivot_table(
@@ -548,6 +552,7 @@ def _build_heatmap(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[s
 
 
 def _build_density(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None and request.y is not None  # guaranteed by _validate_chart_request
     filtered = df[[request.x, request.y]].dropna()
     x_values = _coerce_numeric_series(filtered[request.x], request.x)
     y_values = _coerce_numeric_series(filtered[request.y], request.y)
@@ -649,6 +654,7 @@ def _build_area(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str,
 
 
 def _build_qq_plot(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None  # guaranteed by _validate_chart_request
     filtered = df[[request.x]].dropna()
     values = _coerce_numeric_series(filtered[request.x], request.x)
 
@@ -682,6 +688,7 @@ def _build_qq_plot(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[s
 
 
 def _build_bubble(df: pd.DataFrame, request: ChartRequest) -> tuple[list[dict[str, Any]], int, bool, dict[str, Any]]:
+    assert request.x is not None and request.y is not None  # guaranteed by _validate_chart_request
     cols = [request.x, request.y]
     if request.color:
         cols.append(request.color)
@@ -973,7 +980,7 @@ def _apply_faceting(
     base_y_title = base_layout.get("yaxis", {}).get("title", {}).get("text", "")
     base_title = base_layout.get("title", {}).get("text", request.chart_type.title())
 
-    layout: dict[str, Any] = {
+    layout = {
         "title": {"text": f"{base_title} — faceted by {facet_col}"},
         "template": base_layout.get("template", "plotly_white"),
         "colorway": base_layout.get("colorway", OKABE_ITO_COLORWAY),
@@ -1099,6 +1106,6 @@ def build_chart_figure(
 
     traces, row_count, webgl, layout = builder_fn(df, request)
     figure = {"data": traces, "layout": layout}
-    warnings: list[str] = []
+    warnings = []
     downsampled, displayed_count = _apply_downsampling(figure, request.chart_type, warnings)
     return figure, row_count, webgl, warnings, downsampled, displayed_count

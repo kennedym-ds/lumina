@@ -4,7 +4,7 @@ from datetime import date, datetime
 from numbers import Number
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, SupportsFloat, cast
 
 
 def lttb_downsample(x: Sequence[Any], y: Sequence[Any], threshold: int = 5000) -> tuple[list[Any], list[Any]]:
@@ -104,7 +104,7 @@ def _to_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return float(int(value))
     if isinstance(value, Number):
-        return float(value)
+        return float(cast(SupportsFloat, value))
     if isinstance(value, datetime):
         return value.timestamp()
     if isinstance(value, date):
