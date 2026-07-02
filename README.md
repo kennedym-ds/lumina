@@ -13,7 +13,7 @@ Lumina provides interactive EDA, hypothesis testing, Bayesian inference, and mac
 - **Row Filters** — Composable filter builder with numeric ranges and categorical selections.
 
 ### Visualization
-- **Chart Builder** — 11 chart types: scatter, bar, histogram, box, line, violin, heatmap, density, pie, area, QQ plot. Drag-and-drop variable shelves with WebGL rendering for large datasets.
+- **Chart Builder** — 16 chart types: scatter, bar, histogram, box, line, violin, heatmap, density, pie, area, QQ plot, bubble, strip, error bar, treemap, and parallel coordinates. Drag-and-drop variable shelves with WebGL rendering for large datasets.
 - **Cross-Filtering** — Click any chart selection to filter all linked charts simultaneously.
 - **Faceting** — Split any chart by a categorical variable for small multiples.
 - **Dashboard Builder** — Compose multi-panel dashboards with linked charts.
@@ -25,46 +25,34 @@ Lumina provides interactive EDA, hypothesis testing, Bayesian inference, and mac
 - **Hypothesis Testing** — Independent/paired/one-sample t-tests, chi-square, and ANOVA.
 - **Confidence Intervals & Effect Sizes** — Cohen's d, eta-squared, Cramér's V with configurable CI levels.
 - **Bayesian Inference** — Conjugate-prior one-sample and two-sample tests with Bayes factors.
+- **Multivariate Analysis** — Principal Component Analysis (scree plot, scores, loadings) and K-Means clustering.
 
 ### Modeling
 - **Regression** — OLS, logistic, Ridge, Lasso, Elastic Net, Decision Tree, and Random Forest with polynomial features.
 - **Model Comparison** — Side-by-side history of fitted models with R², RMSE, MAE, and feature importances.
 - **Diagnostics** — Residual plots, confusion matrix, and ROC curves.
+- **Prediction Profiler** — Interactive, JMP-style profiler that updates predictions live as you drag factor sliders.
+- **Curve Fitting** — Nonlinear least-squares fitting (exponential, logistic 4PL, Michaelis–Menten, and more) with R²/RMSE and confidence bands.
+
+### Quality & Design of Experiments
+- **Statistical Process Control** — I-MR and X̄-R/X̄-S control charts with Nelson run-rule violation detection.
+- **Process Capability** — Cp/Cpk/Pp/Ppk indices with out-of-spec PPM estimates and a capability histogram.
+- **Design of Experiments** — Full-factorial, fractional-factorial (with resolution), and Plackett–Burman design generation, plus center points and CSV export.
 
 ### Platform
-- **Project Persistence** — Save/load `.lumina` project files; export charts as PNG/SVG, reports as Markdown.
+- **Project Persistence** — Save/load `.lumina` project files; export charts as PNG/SVG, data as CSV/Excel (with spreadsheet formula-injection guards), and reports as Markdown or printable HTML.
 - **Plugin Architecture** — Extend with custom chart types, transforms, and statistical tests.
 - **Cross-Platform Installers** — MSI/EXE (Windows), DMG (macOS), DEB/AppImage (Linux) via GitHub Actions CI.
 - **Security** — Per-session bearer token auth, localhost-only binding, CORS restricted to Tauri origins.
 
 ## Screenshots
 
-### Getting Started
-| Landing Page | Data Table |
-|---|---|
-| ![Landing](e2e/screenshots/showcase-01-landing.png) | ![Data Table](e2e/screenshots/showcase-02-data-table.png) |
+Showcase screenshots are not committed to the repository. Regenerate them against a
+running dev build with the capture script:
 
-### Chart Builder
-| Scatter Plot | Histogram | Box Plot |
-|---|---|---|
-| ![Scatter](e2e/screenshots/showcase-03-scatter-chart.png) | ![Histogram](e2e/screenshots/showcase-04-histogram.png) | ![Box Plot](e2e/screenshots/showcase-05-box-plot.png) |
-
-| Violin Plot | Heatmap |
-|---|---|
-| ![Violin](e2e/screenshots/showcase-06-violin-plot.png) | ![Heatmap](e2e/screenshots/showcase-07-heatmap.png) |
-
-### Statistical Analysis
-| Dataset Profiling | Correlation Matrix | Distribution Overlay |
-|---|---|---|
-| ![Profiling](e2e/screenshots/showcase-08-profiling.png) | ![Correlation](e2e/screenshots/showcase-09-correlation.png) | ![Distribution](e2e/screenshots/showcase-10-distribution.png) |
-
-### Inference & Modeling
-| Hypothesis Testing | OLS Regression | Random Forest |
-|---|---|---|
-| ![Inference](e2e/screenshots/showcase-11-inference.png) | ![OLS](e2e/screenshots/showcase-12-regression-ols.png) | ![Random Forest](e2e/screenshots/showcase-13-regression-tree.png) |
-
-### Dashboard
-![Dashboard Builder](e2e/screenshots/showcase-14-dashboard.png)
+```powershell
+node e2e/lumina-showcase.mjs
+```
 
 ## Architecture
 
