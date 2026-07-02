@@ -67,6 +67,7 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libfuse2 \
             patchelf
 
       - name: Install frontend dependencies
@@ -82,6 +83,11 @@ jobs:
         run: bash scripts/build-backend.sh
 
       - name: Build Tauri application
+        env:
+          # ubuntu-*-latest GitHub runners don't have FUSE available, which
+          # linuxdeploy/appimagetool need to mount their AppImage tools. This
+          # forces extract-and-run mode instead, bypassing FUSE entirely.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload build artifacts
