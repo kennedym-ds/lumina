@@ -354,6 +354,68 @@ try {
   await page.getByText("Feature Importances").waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
   await capture(page, "showcase-13-regression-tree.png", "Random forest model summary with feature importances");
 
+  // --- Newer analysis platforms ---------------------------------------------
+  // Each capture is isolated so one platform's failure can't abort the others.
+
+  // SPC / Quality — control chart on a measurement column.
+  try {
+    await openTab(page, "Quality");
+    await page.getByLabel("Measurement column").selectOption("body_mass_g");
+    await page.getByRole("button", { name: "Build Control Chart" }).click();
+    await page.locator(".js-plotly-plot").first().waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
+    await page.waitForTimeout(1_200);
+    await capture(page, "showcase-15-spc-quality.png", "SPC control chart with run-rule violation detection");
+  } catch (error) {
+    recordIssue("Quality (SPC)", error instanceof Error ? error.message : String(error));
+  }
+
+  // Multivariate — PCA over all numeric columns.
+  try {
+    await openTab(page, "Multivariate");
+    await page.getByRole("button", { name: "Run PCA" }).click();
+    await page.locator(".js-plotly-plot").first().waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
+    await page.waitForTimeout(1_200);
+    await capture(page, "showcase-16-multivariate.png", "Principal Component Analysis with scree plot and loadings");
+  } catch (error) {
+    recordIssue("Multivariate (PCA)", error instanceof Error ? error.message : String(error));
+  }
+
+  // Design of Experiments — generate a design matrix.
+  try {
+    await openTab(page, "DOE");
+    await page.getByRole("button", { name: "Generate Design" }).click();
+    await page.getByText(/runs?/i).first().waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
+    await page.waitForTimeout(800);
+    await capture(page, "showcase-17-doe.png", "Design of Experiments generated run matrix");
+  } catch (error) {
+    recordIssue("DOE", error instanceof Error ? error.message : String(error));
+  }
+
+  // Curve fitting — fit a model and overlay the fitted curve.
+  try {
+    await openTab(page, "Curve Fit");
+    await page.getByLabel("X column").selectOption("flipper_length_mm");
+    await page.getByLabel("Y column").selectOption("body_mass_g");
+    await page.getByRole("button", { name: "Fit", exact: true }).click();
+    await page.locator(".js-plotly-plot").first().waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
+    await page.waitForTimeout(1_200);
+    await capture(page, "showcase-18-curve-fit.png", "Nonlinear curve fit with fitted-curve overlay and R²/RMSE");
+  } catch (error) {
+    recordIssue("Curve Fit", error instanceof Error ? error.message : String(error));
+  }
+
+  // Prediction profiler — re-fit a model, then open the profiler tab.
+  try {
+    await openTab(page, "Regression");
+    await fitModel(page);
+    await page.getByRole("button", { name: "Profiler", exact: true }).click();
+    await page.locator(".js-plotly-plot").first().waitFor({ state: "visible", timeout: DEFAULT_TIMEOUT });
+    await page.waitForTimeout(1_500);
+    await capture(page, "showcase-19-profiler.png", "Prediction profiler updating predictions live as factor sliders move");
+  } catch (error) {
+    recordIssue("Profiler", error instanceof Error ? error.message : String(error));
+  }
+
   await openTab(page, "Dashboard");
   await addDashboardPanel(page, "heatmap");
   await addDashboardPanel(page, "scatter");

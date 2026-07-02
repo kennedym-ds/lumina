@@ -53,9 +53,11 @@ fn main() {
             #[cfg(not(debug_assertions))]
             {
                 let resource_dir = app.path().resource_dir()?;
-                let backend_exe = resource_dir
-                    .join("lumina-backend")
-                    .join("lumina-backend.exe");
+                #[cfg(windows)]
+                let exe_name = "lumina-backend.exe";
+                #[cfg(not(windows))]
+                let exe_name = "lumina-backend";
+                let backend_exe = resource_dir.join("lumina-backend").join(exe_name);
 
                 let mut command = std::process::Command::new(&backend_exe);
                 command.args(["--port", &port.to_string()]);

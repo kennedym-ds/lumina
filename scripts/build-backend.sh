@@ -7,18 +7,10 @@ BACKEND_ROOT="$REPO_ROOT/backend"
 BUILD_VENV="$BACKEND_ROOT/.venv-build"
 SPEC_PATH="$BACKEND_ROOT/lumina-backend.spec"
 
-case "$(uname -s)-$(uname -m)" in
-    Darwin-arm64)  TARGET="aarch64-apple-darwin" ;;
-    Darwin-x86_64) TARGET="x86_64-apple-darwin" ;;
-    Linux-x86_64)  TARGET="x86_64-unknown-linux-gnu" ;;
-    Linux-aarch64) TARGET="aarch64-unknown-linux-gnu" ;;
-    *)             echo "Unsupported platform"; exit 1 ;;
-esac
+SIDECAR_ROOT="$REPO_ROOT/src-tauri/sidecar"
+FINAL_DIR="$SIDECAR_ROOT/lumina-backend"
 
-TAURI_BIN_DIR="$REPO_ROOT/src-tauri/binaries"
-TARGET_EXE="$TAURI_BIN_DIR/lumina-backend-$TARGET"
-
-echo "[INFO] Building for target: $TARGET"
+echo "[INFO] Building backend sidecar (onedir)"
 
 rm -rf "$BUILD_VENV"
 python3 -m venv "$BUILD_VENV"
@@ -31,10 +23,15 @@ pip install "pyinstaller>=6,<7"
 cd "$BACKEND_ROOT"
 python -m PyInstaller --noconfirm --clean "$SPEC_PATH"
 
-DIST_EXE="$BACKEND_ROOT/dist/lumina-backend"
-mkdir -p "$TAURI_BIN_DIR"
-cp "$DIST_EXE" "$TARGET_EXE"
-chmod +x "$TARGET_EXE"
+DIST_DIR="$BACKEND_ROOT/dist/lumina-backend"
+if [ ! -d "$DIST_DIR" ]; then
+    echo "[ERROR] Expected PyInstaller onedir output not found: $DIST_DIR" >&2
+    exit 1
+fi
 
-echo "[OK] Sidecar staged at: $TARGET_EXE"
-du -sh "$TARGET_EXE"
+rm -rf "$FINAL_DIR"
+mkdir -p "$SIDECAR_ROOT"
+cp -r "$DIST_DIR" "$FINAL_DIR"
+
+SIZE=$(du -sh "$FINAL_DIR" | cut -f1)
+echo "[OK] Sidecar staged at: $FINAL_DIR ($SIZE)"
