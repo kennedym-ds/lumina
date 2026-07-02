@@ -82,13 +82,17 @@ jobs:
         if: runner.os != 'Windows'
         run: bash scripts/build-backend.sh
 
-      - name: Build Tauri application
-        env:
-          # ubuntu-*-latest GitHub runners don't have FUSE available, which
-          # linuxdeploy/appimagetool need to mount their AppImage tools. This
-          # forces extract-and-run mode instead, bypassing FUSE entirely.
-          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - name: Build Tauri application (Windows/macOS)
+        if: runner.os != 'Linux'
         run: npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Build Tauri application (Linux)
+        if: runner.os == 'Linux'
+        # linuxdeploy hangs/fails building the AppImage on GitHub's Linux
+        # runners regardless of FUSE workarounds (no reliable fix found —
+        # known upstream flakiness). deb and rpm bundle cleanly, so restrict
+        # Linux CI builds to those and skip AppImage.
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles deb,rpm
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -99,6 +103,7 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.rpm
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
           if-no-files-found: warn
